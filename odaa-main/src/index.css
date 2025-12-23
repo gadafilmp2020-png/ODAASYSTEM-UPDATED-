@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Chakra+Petch:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-brand-dark text-slate-300 antialiased selection:bg-brand-lime/30 selection:text-brand-lime;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  overflow-x: hidden;
+}
+
+button {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:active:not(:disabled) {
+  @apply scale-95 brightness-90;
+}
+
+.shadow-glow-lime {
+  box-shadow: 0 0 20px rgba(190, 242, 100, 0.15);
+}
+
+.shadow-glow-lime:hover {
+  box-shadow: 0 0 40px rgba(190, 242, 100, 0.3);
+}
+
+/* Custom Table Styles for Protocol Look */
+.protocol-table {
+  @apply w-full text-left;
+}
+
+.protocol-table thead th {
+  @apply bg-black/40 py-6 px-8 text-[9px] font-black uppercase tracking-[0.4em] text-slate-500 border-b border-white/5;
+}
+
+.protocol-table tbody td {
+  @apply py-6 px-8 text-sm border-b border-white/5 align-middle;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}

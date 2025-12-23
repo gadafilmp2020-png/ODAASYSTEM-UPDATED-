@@ -1,0 +1,75 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Chakra+Petch:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-200 antialiased selection:bg-lime-500/30 selection:text-lime-800 dark:selection:text-lime-200 transition-colors duration-500;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  overflow-x: hidden;
+}
+
+/* --- BUTTON SHADOWS --- */
+button, 
+.cyber-button, 
+.brand-button, 
+.action-btn,
+[role="button"] {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover:not(:disabled) {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+button:active:not(:disabled) {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  transform: translateY(0);
+}
+
+button:disabled {
+  box-shadow: none;
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* --- CLEAN BACKGROUND GEOMETRY --- */
+.bg-mesh {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+.dark .bg-mesh {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* --- WIDGET SHADOWS --- */
+.widget-card {
+  @apply relative overflow-hidden transition-all duration-500 border;
+  @apply bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl border-slate-200 dark:border-white/10;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.dark .widget-card {
+  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes slow-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.05); }
+}
+
+.animate-slow-pulse {
+  animation: slow-pulse 10s ease-in-out infinite;
+}

@@ -1,0 +1,4 @@
+
+{
+  "description": "Backend removed. The logic has been fully migrated to odaa-main/services/algorithm.ts for the client-side simulation."
+}
