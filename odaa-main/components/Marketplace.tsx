@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, MarketOrder, SystemSettings, ActiveTrade, ViewState } from '../types';
 import { 
@@ -96,7 +97,11 @@ export const Marketplace: React.FC<MarketplaceProps> = ({
       
       if (amount < (systemSettings.minOTFSell || 10)) { setPostError(`Min: ${systemSettings.minOTFSell || 10} OTF`); setIsPosting(false); return; }
       if (amount > (systemSettings.maxOTFSell || 10000)) { setPostError(`Max Sell Limit: ${systemSettings.maxOTFSell || 10000} OTF`); setIsPosting(false); return; }
-      if (price < (systemSettings.minOTFRateETB || 0.5)) { setPostError(`Min Rate: ${systemSettings.minOTFRateETB || 0.5}`); setIsPosting(false); return; }
+      
+      // Unit Rate Validation
+      if (price < (systemSettings.minOTFRateETB || 0.5)) { setPostError(`Min Rate: ${systemSettings.minOTFRateETB || 0.5} ETB`); setIsPosting(false); return; }
+      if (price > (systemSettings.maxOTFRateETB || 100)) { setPostError(`Max Rate: ${systemSettings.maxOTFRateETB || 100} ETB`); setIsPosting(false); return; }
+      
       if (minimum > amount) { setPostError(`Min limit per buyer cannot exceed total volume.`); setIsPosting(false); return; }
 
       let bankDetails = '';
@@ -181,7 +186,7 @@ export const Marketplace: React.FC<MarketplaceProps> = ({
        </div>
 
        {activeTab === 'SELL' && (
-           <div className="grid grid-cols-1 gap-12 max-w-4xl mx-auto">
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
                <div className="widget-card-2025 p-12 rounded-[3.5rem] relative border-brand-lime/20 shadow-premium overflow-hidden">
                    <div className="flex items-center gap-6 mb-12 relative z-10">
                        <div className="p-4 bg-brand-lime/10 rounded-2xl border border-brand-lime/20 text-brand-lime shrink-0"><PlusCircle size={32} /></div>
@@ -189,61 +194,91 @@ export const Marketplace: React.FC<MarketplaceProps> = ({
                    </div>
 
                    <form onSubmit={handlePostSellOrder} className="space-y-10 relative z-10">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Volume (OTF)</label>
-                                    <div className="relative group">
-                                        <Coins className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
-                                        <input required type="number" className="tech-input-new pl-14 !py-4 font-bold" placeholder={`Amount`} value={sellAmount} onChange={e => setSellAmount(e.target.value)} />
-                                    </div>
-                                    <p className="pl-5 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                        Min Sell Limit: {systemSettings.minOTFSell || 10} OTF | Max: {systemSettings.maxOTFSell || 10000} OTF
-                                    </p>
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Volume (OTF)</label>
+                                <div className="relative group">
+                                    <Coins className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
+                                    <input required type="number" className="tech-input-new pl-14 !py-4 font-bold" placeholder={`Amount`} value={sellAmount} onChange={e => setSellAmount(e.target.value)} />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Min. Buyer Limit (OTF)</label>
-                                    <div className="relative group">
-                                        <Scale className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
-                                        <input type="number" className="tech-input-new pl-14 !py-4 font-bold" placeholder="Optional Min Qty" value={minQty} onChange={e => setMinQty(e.target.value)} />
-                                    </div>
-                                    <p className="pl-5 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                        Buyers cannot purchase less than this amount.
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Unit Rate (ETB)</label>
-                                    <div className="relative group">
-                                        <TrendingUp className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
-                                        <input required type="number" step="0.01" className="tech-input-new pl-14 !py-4 font-bold" value={sellPrice} onChange={e => setSellPrice(e.target.value)} />
-                                    </div>
-                                </div>
+                                <p className="pl-5 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Min Sell Limit: {systemSettings.minOTFSell || 10} OTF | Max: {systemSettings.maxOTFSell || 10000} OTF
+                                </p>
                             </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Min. Buyer Limit (OTF)</label>
+                                <div className="relative group">
+                                    <Scale className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
+                                    <input type="number" className="tech-input-new pl-14 !py-4 font-bold" placeholder="Optional Min Qty" value={minQty} onChange={e => setMinQty(e.target.value)} />
+                                </div>
+                                <p className="pl-5 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Buyers cannot purchase less than this amount.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest pl-5">Unit Rate (ETB)</label>
+                                <div className="relative group">
+                                    <TrendingUp className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30 group-focus-within:text-brand-lime transition-colors" size={20} />
+                                    <input required type="number" step="0.01" className="tech-input-new pl-14 !py-4 font-bold" value={sellPrice} onChange={e => setSellPrice(e.target.value)} />
+                                </div>
+                                <p className="pl-5 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                    Allowed Range: {systemSettings.minOTFRateETB || 0.5} - {systemSettings.maxOTFRateETB || 100} ETB
+                                </p>
+                            </div>
+                        </div>
 
-                            <div className="space-y-6 bg-black/40 p-8 rounded-[3rem] border border-white/5 shadow-inner">
-                                <div className="flex bg-slate-900 p-1 rounded-2xl mb-4">
-                                    <button type="button" onClick={() => setSettlementType('BANK')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settlementType === 'BANK' ? 'bg-brand-lime text-black' : 'text-slate-500'}`}>Local Bank</button>
-                                    <button type="button" onClick={() => setSettlementType('CRYPTO')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settlementType === 'CRYPTO' ? 'bg-brand-lime text-black' : 'text-slate-500'}`}>Crypto</button>
-                                </div>
-                                {settlementType === 'BANK' ? (
-                                    <div className="space-y-4 animate-slide-in-right">
-                                        <div className="relative group"><Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs" placeholder="Bank Name" value={sellBankName} onChange={e => setSellBankName(e.target.value)} /></div>
-                                        <div className="relative group"><Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs font-mono" placeholder="Account Number" value={sellAccountNumber} onChange={e => setSellAccountNumber(e.target.value)} /></div>
-                                        <div className="relative group"><UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs" placeholder="Account Holder Name" value={sellAccountHolder} onChange={e => setSellAccountHolder(e.target.value)} /></div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4 animate-slide-in-right">
-                                        <div className="relative group"><Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><select className="tech-input-new pl-14 !py-3 !text-xs appearance-none" value={sellCryptoExchange} onChange={e => setSellCryptoExchange(e.target.value)}><option value="Binance">Binance</option><option value="Bybit">Bybit</option></select></div>
-                                        <div className="relative group"><Fingerprint className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs font-mono" placeholder="Wallet Address" value={sellCryptoAddress} onChange={e => setSellCryptoAddress(e.target.value)} /></div>
-                                    </div>
-                                )}
+                        <div className="space-y-6 bg-black/40 p-8 rounded-[3rem] border border-white/5 shadow-inner">
+                            <div className="flex bg-slate-900 p-1 rounded-2xl mb-4">
+                                <button type="button" onClick={() => setSettlementType('BANK')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settlementType === 'BANK' ? 'bg-brand-lime text-black' : 'text-slate-500'}`}>Local Bank</button>
+                                <button type="button" onClick={() => setSettlementType('CRYPTO')} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${settlementType === 'CRYPTO' ? 'bg-brand-lime text-black' : 'text-slate-500'}`}>Crypto</button>
                             </div>
-                       </div>
+                            {settlementType === 'BANK' ? (
+                                <div className="space-y-4 animate-slide-in-right">
+                                    <div className="relative group"><Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs" placeholder="Bank Name" value={sellBankName} onChange={e => setSellBankName(e.target.value)} /></div>
+                                    <div className="relative group"><Hash className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs font-mono" placeholder="Account Number" value={sellAccountNumber} onChange={e => setSellAccountNumber(e.target.value)} /></div>
+                                    <div className="relative group"><UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs" placeholder="Account Holder Name" value={sellAccountHolder} onChange={e => setSellAccountHolder(e.target.value)} /></div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 animate-slide-in-right">
+                                    <div className="relative group"><Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><select className="tech-input-new pl-14 !py-3 !text-xs appearance-none" value={sellCryptoExchange} onChange={e => setSellCryptoExchange(e.target.value)}><option value="Binance">Binance</option><option value="Bybit">Bybit</option></select></div>
+                                    <div className="relative group"><Fingerprint className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-14 !py-3 !text-xs font-mono" placeholder="Wallet Address" value={sellCryptoAddress} onChange={e => setSellCryptoAddress(e.target.value)} /></div>
+                                </div>
+                            )}
+                        </div>
                        
                        {postError && <p className="text-red-400 text-xs font-bold bg-red-950/20 p-2 rounded border border-red-900/50 animate-bounce text-center">{postError}</p>}
                        
                        <button disabled={isPosting} className="w-full py-6 primary-gradient-new">Post Order</button>
                    </form>
+               </div>
+
+               {/* PREVIEW CARD */}
+               <div className="space-y-6">
+                   <h3 className="text-xl font-black text-white font-tech uppercase tracking-tighter">Preview: Buyer's View</h3>
+                   <div className="widget-card-2025 p-8 rounded-[3rem] border-brand-lime/20 flex flex-col justify-between h-[420px] shadow-lg relative opacity-90 hover:opacity-100 transition-opacity">
+                        <div className="absolute top-4 right-6 bg-brand-lime/20 text-brand-lime px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-brand-lime/30">Preview Mode</div>
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-start">
+                                <div className="p-3 bg-brand-lime/10 rounded-xl border border-brand-lime/20 text-brand-lime"><ShoppingBag size={24}/></div>
+                                <div className="text-right">
+                                    <div className="flex items-center justify-end gap-0.5 mb-1">{[1,2,3,4,5].map(i => <Star key={i} size={8} className="text-brand-lime fill-current"/>)}</div>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase">Verified</p>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="text-4xl font-black text-white font-tech leading-none">{sellAmount || '0'} <span className="text-xs font-normal opacity-50 uppercase tracking-widest ml-2">OTF</span></h4>
+                                <div className="flex items-center gap-2 mt-4"><p className="text-[10px] text-slate-500 font-mono tracking-widest font-black uppercase">@{currentUser.username}</p></div>
+                            </div>
+                            <div className="p-5 bg-slate-900/50 rounded-2xl border border-white/5 space-y-2">
+                                <div className="flex justify-between items-center"><span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Rate</span><span className="text-lg font-black text-white font-mono">{sellPrice || '0.00'} ETB</span></div>
+                                {Number(minQty) > 0 && (
+                                    <div className="flex justify-between items-center"><span className="text-[9px] text-amber-500 uppercase font-black tracking-widest">Min Buy</span><span className="text-sm font-black text-amber-500 font-mono">{minQty} OTF</span></div>
+                                )}
+                            </div>
+                        </div>
+                        <button disabled className="w-full py-4 bg-slate-900 text-slate-500 rounded-2xl text-[10px] font-black uppercase border border-brand-lime/10 cursor-not-allowed">Buy Now</button>
+                   </div>
+                   <p className="text-center text-xs text-slate-500 font-mono uppercase tracking-widest">This is how your order appears in the marketplace.</p>
                </div>
            </div>
        )}

@@ -101,7 +101,6 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
         odaa_trades: activeTrades, odaa_ft_registry: usedFTNumbers,
         odaa_p2p_req: p2pRequests, odaa_pwd_reset: passwordResetRequests, odaa_device_req: deviceApprovalRequests
       };
-      // User data is now handled by UserContext persistence, so we don't save odaa_users here
       Object.entries(data).forEach(([key, val]) => {
         localStorage.setItem(`${key}_${STORAGE_VERSION}`, JSON.stringify(val));
       });
@@ -109,7 +108,7 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
     return () => clearTimeout(saveTimer);
   }, [systemSettings, allTransactions, pendingRegistrations, notifications, messages, activityLogs, kycRequests, marketOrders, activeTrades, usedFTNumbers, p2pRequests, passwordResetRequests, deviceApprovalRequests]);
 
-  const handleUpdateUser = updateUser; // Map direct reference
+  const handleUpdateUser = updateUser; 
 
   const handleLogActivity = (userId: string, userName: string, action: ActivityLog['action'], details: string) => {
       const log: ActivityLog = { id: `log-${Date.now()}`, userId, userName, action, details, timestamp: new Date().toISOString() };
@@ -135,8 +134,8 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
 
   // --- P2P & SECURITY HANDLERS ---
   
-  // Handles creating the initial request
   const handleP2PRequest = (req: any, targetUsername: string) => {
+      if (!currentUser) return;
       const targetUser = allUsers.find(u => u.username.toLowerCase() === targetUsername.toLowerCase());
       if (!targetUser) throw new Error("Target user not found");
       
@@ -144,11 +143,10 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       
       const newReq: P2PRequest = {
           id: `p2p-${Date.now()}`,
-          requestorId: currentUser!.id,
-          requestorName: currentUser!.username,
+          requestorId: currentUser.id,
+          requestorName: currentUser.username,
           targetUserId: targetUser.id,
           targetUserName: targetUser.username,
-          // If sending, it goes to Admin for approval. If requesting, it goes to Sender (Target) first.
           status: isSend ? 'PENDING_ADMIN' : 'PENDING_SENDER',
           date: new Date().toISOString(),
           ...req
@@ -157,21 +155,18 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       setP2PRequests(prev => [newReq, ...prev]);
       
       if (isSend) {
-          handleAddNotification(targetUser.id, `Incoming Funds: ${currentUser!.username} has sent ${req.amount} OTF. Pending Admin Approval.`, 'INFO');
-          handleAddNotification('admin1', `P2P SEND: ${currentUser!.username} -> ${targetUser.username} (${req.amount} OTF). Needs Approval.`, 'WARNING');
+          handleAddNotification(targetUser.id, `Incoming Funds: ${currentUser.username} has sent ${req.amount} OTF. Pending Admin Approval.`, 'INFO');
+          handleAddNotification('admin1', `P2P SEND: ${currentUser.username} -> ${targetUser.username} (${req.amount} OTF). Needs Approval.`, 'WARNING');
       } else {
-          handleAddNotification(targetUser.id, `Payment Request: ${currentUser!.username} requests ${req.amount} OTF. Approve in Wallet.`, 'WARNING');
+          handleAddNotification(targetUser.id, `Payment Request: ${currentUser.username} requests ${req.amount} OTF. Approve in Wallet.`, 'WARNING');
       }
   };
 
-  // Handles updates to the request (Sender approves request, or Admin approves final)
   const handleP2PAction = (id: string, action: 'APPROVE' | 'REJECT') => {
       setP2PRequests(prev => prev.map(r => {
           if (r.id !== id) return r;
           
-          // SCENARIO 1: Sender Approves a "Request Money" call (Funds Owner)
           if (action === 'APPROVE' && r.status === 'PENDING_SENDER') {
-              // Ensure Sender has balance check even at this stage
               const sender = allUsers.find(u => u.id === r.targetUserId);
               if (sender && sender.balance < r.total) {
                   handleAddNotification(r.targetUserId, `Error: Insufficient balance to approve request.`, 'ERROR');
@@ -183,30 +178,24 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
               return { ...r, status: 'PENDING_ADMIN' };
           }
 
-          // SCENARIO 2: Admin Approves the movement of funds
           if (action === 'APPROVE' && r.status === 'PENDING_ADMIN') {
-              // Identify Sender (Money Leaver) and Receiver (Money Gainer)
-              // If type 'SEND', requestor is sender. If type 'REQUEST', target is sender.
               const senderId = r.type === 'SEND' ? r.requestorId : r.targetUserId;
               const receiverId = r.type === 'SEND' ? r.targetUserId : r.requestorId;
               
-              // Verify balances again before execution
               const sender = allUsers.find(u => u.id === senderId);
               if (!sender || sender.balance < r.total) {
-                  return { ...r, status: 'REJECTED' }; // Insufficient funds at time of admin action
+                  return { ...r, status: 'REJECTED' }; 
               }
 
-              // Set Withdrawal Lock (24 Hours from now)
               const lockUntil = new Date();
               lockUntil.setHours(lockUntil.getHours() + 24);
 
-              // Update global user state via Context Setter
               setAllUsers(users => users.map(u => {
-                  if (u.id === senderId) return { ...u, balance: u.balance - r.total }; // Total includes Fee
+                  if (u.id === senderId) return { ...u, balance: u.balance - r.total }; 
                   if (u.id === receiverId) return { 
                       ...u, 
                       balance: u.balance + r.amount,
-                      securityCooldownUntil: lockUntil.toISOString() // Apply 24h Lock to Receiver
+                      securityCooldownUntil: lockUntil.toISOString() 
                   };
                   return u;
               }));
@@ -217,7 +206,7 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
           }
           
           if (action === 'REJECT') {
-              const notifTarget = r.type === 'SEND' ? r.requestorId : r.requestorId; // Notify initiator
+              const notifTarget = r.type === 'SEND' ? r.requestorId : r.requestorId; 
               handleAddNotification(notifTarget, `P2P Transaction Rejected.`, 'ERROR');
           }
 
@@ -235,7 +224,7 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
   const handleApprovePasswordReset = (requestId: string) => {
       const req = passwordResetRequests.find(r => r.id === requestId);
       if(req) {
-          handleUpdateUser(req.userId, { password: 'password123', isTwoFactorEnabled: false }); // Reset to default
+          handleUpdateUser(req.userId, { password: 'password123', isTwoFactorEnabled: false }); 
           setPasswordResetRequests(p => p.filter(r => r.id !== requestId));
           handleAddNotification(req.userId, 'Your password has been reset to "password123" by Admin.', 'WARNING');
       }
@@ -258,14 +247,12 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       }
   };
 
-  // --- ESCROW & TRADE LOGIC ---
   const handleInitiateTrade = (trade: ActiveTrade, orderId: string) => {
       const seller = allUsers.find(u => u.id === trade.sellerId);
       const order = marketOrders.find(o => o.id === orderId);
       if (!seller || !order) { alert("Trade Error: Seller or Order not found."); return; }
       if (seller.balance < trade.amountOTF) { alert("Trade Failed: Seller has insufficient funds for Escrow lock."); return; }
 
-      // Escrow Lock
       const newSellerBalance = seller.balance - trade.amountOTF;
       handleUpdateUser(seller.id, { balance: newSellerBalance });
       handleLogActivity('system', 'System', 'TRADE_ACTION', `Escrow Locked: ${trade.amountOTF} OTF from ${seller.username}`);
@@ -311,7 +298,6 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       }));
   };
 
-  // --- COMMISSION & REGISTRATION ENGINE ---
   const handleApproveRegistration = (regId: string) => {
       const reg = pendingRegistrations.find(r => r.id === regId);
       if (!reg) return;
@@ -365,7 +351,6 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
           isOnline: false
       };
 
-      // NEW ALGORITHM EXECUTION
       const { updatedUsers, newTransactions } = processNewMemberLogic(newUser, allUsers, systemSettings);
 
       setAllUsers(updatedUsers);
@@ -403,7 +388,6 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
           return t;
       }));
 
-      // Bulk Update via Context
       setAllUsers(prev => prev.map(u => {
           if (userBalanceUpdates.has(u.id)) {
               const newBalance = userBalanceUpdates.get(u.id) || u.balance;
@@ -458,7 +442,10 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       }
   };
 
-  if (!isAuthenticated) return <Login onLogin={handleLogin} users={allUsers} onReportPasswordReset={handleReportPasswordReset} onRequestDeviceApproval={handleRequestDeviceApproval} />;
+  // Safe check for user existence before rendering app
+  if (!isAuthenticated || !currentUser) {
+      return <Login onLogin={handleLogin} users={allUsers} onReportPasswordReset={handleReportPasswordReset} onRequestDeviceApproval={handleRequestDeviceApproval} />;
+  }
 
   return (
     <div className="min-h-screen relative text-slate-200 bg-brand-dark">
@@ -474,7 +461,7 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
       </div>
 
       <Sidebar 
-        currentView={currentView} setView={setCurrentView} role={currentUser?.role || 'MEMBER'} onLogout={handleLogout} 
+        currentView={currentView} setView={setCurrentView} role={currentUser.role} onLogout={handleLogout} 
         isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} theme={theme} toggleTheme={toggleTheme} 
         notificationCount={notifications.filter(n => !n.read).length}
         adminActionCount={pendingRegistrations.length}
@@ -494,15 +481,15 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
         <div className="max-w-7xl mx-auto">
           {currentView === 'DASHBOARD' && (
             <Dashboard 
-                user={currentUser!} usersList={allUsers} transactions={allTransactions} 
-                systemSettings={systemSettings} onUpdateProfile={u => handleUpdateUser(currentUser!.id, u)}
+                user={currentUser} usersList={allUsers} transactions={allTransactions} 
+                systemSettings={systemSettings} onUpdateProfile={u => handleUpdateUser(currentUser.id, u)}
                 onViewChange={setCurrentView}
-                onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser!.id}, ...p])}
+                onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser.id}, ...p])}
                 onStartKYC={() => setCurrentView('SECURITY')}
             />
           )}
           
-          {currentView === 'ADMIN_DASHBOARD' && currentUser?.role === 'ADMIN' && (
+          {currentView === 'ADMIN_DASHBOARD' && currentUser.role === 'ADMIN' && (
             <AdminDashboard 
                 users={allUsers} setUsers={setAllUsers} transactions={allTransactions} setTransactions={setAllTransactions} 
                 addNotification={handleAddNotification} 
@@ -533,21 +520,20 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
 
           {currentView === 'WALLET' && (
             <Wallet 
-                user={currentUser!} allUsers={allUsers} transactions={allTransactions} 
-                onAddTransaction={t => { setAllTransactions(p => [t, ...p]); handleLogActivity(currentUser!.id, currentUser!.name, 'TRANSACTION_REQUEST', `Type: ${t.type}, Amount: ${t.amount}`); }} 
+                user={currentUser} allUsers={allUsers} transactions={allTransactions} 
+                onAddTransaction={t => { setAllTransactions(p => [t, ...p]); handleLogActivity(currentUser.id, currentUser.name, 'TRANSACTION_REQUEST', `Type: ${t.type}, Amount: ${t.amount}`); }} 
                 onUpdateTransaction={(id, updates) => setAllTransactions(p => p.map(t => t.id === id ? { ...t, ...updates } : t))}
                 onUpdateUser={handleUpdateUser}
                 systemSettings={systemSettings}
                 isFTUsed={(ft) => allTransactions.some(t => t.ftNumber === ft)}
                 onP2PRequest={handleP2PRequest}
-                // Pass P2P requests related to this user to the wallet
-                p2pRequests={p2pRequests.filter(r => r.targetUserId === currentUser?.id || r.requestorId === currentUser?.id)}
-                onP2PAction={handleP2PAction} // Allow user to approve/reject
+                p2pRequests={p2pRequests.filter(r => r.targetUserId === currentUser.id || r.requestorId === currentUser.id)}
+                onP2PAction={handleP2PAction} 
             />
           )}
           {currentView === 'MARKETPLACE' && (
             <Marketplace 
-                currentUser={currentUser!} allUsers={allUsers} systemSettings={systemSettings}
+                currentUser={currentUser} allUsers={allUsers} systemSettings={systemSettings}
                 marketOrders={marketOrders} activeTrades={activeTrades} 
                 onPlaceOrder={o => setMarketOrders(p => [...p, o])}
                 onInitiateTrade={handleInitiateTrade}
@@ -555,14 +541,14 @@ export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void
                 isFTUsed={(ft) => activeTrades.some(t => t.ftNumber === ft)}
             />
           )}
-          {currentView === 'GENEALOGY' && <GenealogyTree users={allUsers} rootId={currentUser!.id} />}
-          {currentView === 'TEAM' && <Team currentUser={currentUser!} allUsers={allUsers} />}
-          {currentView === 'SECURITY' && <SecurityView user={currentUser!} onUpdateSettings={handleUpdateUser} onReportPasswordReset={handleReportPasswordReset} onKycSubmission={k => setKycRequests(p => [{ ...k, id: `k${Date.now()}`, userId: currentUser!.id, username: currentUser!.username, timestamp: new Date().toISOString(), status: 'PENDING' } as VerificationRequest, ...p])} />}
-          {currentView === 'REGISTER' && <MemberRegistration currentUser={currentUser!} usersList={allUsers} systemSettings={systemSettings} onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser!.id}, ...p])} isFTUsed={(ft) => allTransactions.some(t => t.ftNumber === ft)} />}
+          {currentView === 'GENEALOGY' && <GenealogyTree users={allUsers} rootId={currentUser.id} />}
+          {currentView === 'TEAM' && <Team currentUser={currentUser} allUsers={allUsers} />}
+          {currentView === 'SECURITY' && <SecurityView user={currentUser} onUpdateSettings={handleUpdateUser} onReportPasswordReset={handleReportPasswordReset} onKycSubmission={k => setKycRequests(p => [{ ...k, id: `k${Date.now()}`, userId: currentUser.id, username: currentUser.username, timestamp: new Date().toISOString(), status: 'PENDING' } as VerificationRequest, ...p])} />}
+          {currentView === 'REGISTER' && <MemberRegistration currentUser={currentUser} usersList={allUsers} systemSettings={systemSettings} onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser.id}, ...p])} isFTUsed={(ft) => allTransactions.some(t => t.ftNumber === ft)} />}
         </div>
       </main>
       
-      {currentUser?.role !== 'ADMIN' && <SupportChat currentUser={currentUser!} messages={messages} onSendMessage={handleSendMessage} isSupportOnline={allUsers.some(u => u.role === 'ADMIN' && u.isOnline)} />}
+      {currentUser.role !== 'ADMIN' && <SupportChat currentUser={currentUser} messages={messages} onSendMessage={handleSendMessage} isSupportOnline={allUsers.some(u => u.role === 'ADMIN' && u.isOnline)} />}
     </div>
   );
 };

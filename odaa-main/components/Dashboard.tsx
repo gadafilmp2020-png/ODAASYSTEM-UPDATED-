@@ -1,10 +1,10 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { User, Transaction, Notification, PendingRegistration, P2PRequest, SystemSettings, VerificationRequest, ViewState, SystemBackup } from '../types';
 import { 
   Users, Award, X, Wallet, UserPlus, Network, Zap, Camera, ScanFace, RotateCcw, 
   ArrowDownLeft, ArrowUpRight, ShoppingBag, Coins, Send, QrCode, CreditCard, 
-  ShieldAlert, Activity, ArrowRightLeft
+  ShieldAlert, Activity, ArrowRightLeft, ShieldCheck, Shield
 } from 'lucide-react';
 import { CurrencyIcon } from './CurrencyIcon';
 import { OTF_VALUE_ETB } from '../constants';
@@ -12,6 +12,7 @@ import { DynamicBackground } from './DynamicBackground';
 import { AIAdvisor } from './AIAdvisor';
 import { VerificationBadge } from './VerificationBadge';
 import { useLanguage } from '../contexts/LanguageContext';
+import { calculateUserRiskScore, getRiskColorClass } from '../services/securityLogic';
 
 interface DashboardProps {
   user: User;
@@ -53,7 +54,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [regError, setRegError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  const securityInfo = useMemo(() => calculateUserRiskScore(user), [user]);
 
   const handleRegSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,26 +83,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         placementMode: 'AUTO', manualParentUsername: '', manualLeg: 'LEFT'
       });
     }
-  };
-
-  const handleRestoreFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const json = JSON.parse(e.target?.result as string);
-            if (!json.metadata || !json.data) throw new Error("Invalid protocol format.");
-            const challenge = window.prompt(`RESTORE SHORTCUT: Reload Backup v${json.metadata.version}?\n\nType 'RESTORE' to confirm:`);
-            if (challenge === 'RESTORE') {
-                if (onRestoreSystem) onRestoreSystem(json as SystemBackup);
-                alert("Protocol Restored Successfully.");
-                window.location.reload();
-            }
-        } catch (error: any) { alert(`Restore Error: ${error.message}`); }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
   };
 
   const stats = [
@@ -184,8 +166,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row justify-between items-center md:items-end gap-8 animate-fade-in">
             <div className="flex items-center gap-8">
                 <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2.5rem] border-4 border-brand-lime/30 p-2 bg-brand-surface shadow-2xl relative overflow-hidden">
-                        <img src={user.avatarUrl || user.avatar} alt="Profile" className="w-full h-full rounded-[1.8rem] object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-brand-lime/30 p-2 bg-brand-surface shadow-2xl relative overflow-hidden">
+                        <img src={user.avatarUrl || user.avatar} alt="Profile" className="w-full h-full rounded-full object-cover transition-transform duration-700 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Camera size={32} className="text-white"/>
                         </div>
@@ -299,21 +281,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <AIAdvisor user={user} recentTransactions={transactions} />
             </div>
             <div className="flex flex-col gap-6">
-                 <button onClick={onStartKYC} className="member-action-btn !flex-row !justify-start !p-8 !rounded-[3rem] bg-indigo-500/5 border-indigo-500/20 hover:border-indigo-500/40">
-                    <div className="p-4 bg-indigo-500/10 rounded-2xl text-indigo-400"><ScanFace size={28}/></div>
+                 {/* SECURITY PULSE WIDGET (RISK FIX) */}
+                 <button onClick={() => onViewChange?.('SECURITY')} className={`member-action-btn !flex-row !justify-start !p-8 !rounded-[3rem] border transition-all ${securityInfo.score < 50 ? 'bg-red-500/5 border-red-500/20 hover:border-red-500/40' : 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'}`}>
+                    <div className={`p-4 rounded-2xl ${securityInfo.score < 50 ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                        {securityInfo.score < 50 ? <ShieldAlert size={28}/> : <ShieldCheck size={28}/>}
+                    </div>
                     <div className="text-left ml-4">
-                        <span className="block font-black text-white text-sm font-tech uppercase tracking-wide">Secure Biometrics</span>
-                        <span className="text-[10px] text-slate-500 font-mono">KYC AUTHENTICATION</span>
+                        <div className="flex items-center gap-2">
+                            <span className="block font-black text-white text-sm font-tech uppercase tracking-wide">Node Integrity</span>
+                            <span className={`text-[10px] font-mono font-bold ${getRiskColorClass(securityInfo.score)}`}>{securityInfo.score}%</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono uppercase">
+                            {securityInfo.score < 50 ? 'CRITICAL: LINK UNSECURE' : 'UPLINK SIGNAL: STEADY'}
+                        </span>
                     </div>
                  </button>
-                 <button onClick={() => restoreInputRef.current?.click()} className="member-action-btn !flex-row !justify-start !p-8 !rounded-[3rem] bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40">
-                    <div className="p-4 bg-amber-500/10 rounded-2xl text-amber-400"><RotateCcw size={28}/></div>
-                    <div className="text-left ml-4">
-                        <span className="block font-black text-white text-sm font-tech uppercase tracking-wide">Legacy Sync</span>
-                        <span className="text-[10px] text-slate-500 font-mono">{t('resetProtocol')}</span>
-                    </div>
-                    <input type="file" ref={restoreInputRef} className="hidden" accept=".json" onChange={handleRestoreFile} />
-                 </button>
+                 
                  <div className="p-8 bg-brand-surface/40 border border-white/5 rounded-[3rem] flex items-center justify-between group">
                     <div className="space-y-1">
                         <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Protocol Signal</p>
@@ -326,7 +309,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
         </div>
 
-        {/* Registration Modal (Legacy Ported) */}
+        {/* Registration Modal */}
         {showRegModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl animate-fade-in">
                 <div className="widget-card-2025 rounded-[3rem] w-full max-w-lg shadow-2xl animate-scale-in border-brand-lime/20 max-h-[90vh] overflow-y-auto custom-scrollbar">

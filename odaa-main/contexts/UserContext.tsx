@@ -43,7 +43,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!currentUser);
+  // Derived state to ensure synchronization with currentUser
+  const isAuthenticated = !!currentUser;
 
   // Persist Users whenever they change
   useEffect(() => {
@@ -54,10 +55,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(currentUser));
-      setIsAuthenticated(true);
     } else {
       localStorage.removeItem(STORAGE_KEY_SESSION);
-      setIsAuthenticated(false);
     }
   }, [currentUser]);
 
@@ -109,7 +108,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login, 
         logout, 
         updateUser, 
-        registerUser,
+        registerUser, 
         setAllUsers,
         refreshSession
     }}>

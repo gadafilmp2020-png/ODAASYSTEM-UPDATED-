@@ -1,3 +1,4 @@
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
@@ -24,7 +25,7 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          '@': path.resolve(__dirname, '.'),
+          '@': path.resolve(__dirname, '.'), // Corrected: Points to current folder (odaa-main)
         }
       },
       build: {

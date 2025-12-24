@@ -1,3 +1,4 @@
+
 import { Rank, User, Transaction, Role, Permission } from './types';
 
 // Helper to generate dates

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useContext, useEffect, useRef } from 'react';
 import { User, Rank } from '../types';
 import { 
@@ -261,61 +262,6 @@ export const GenealogyTree: React.FC<{ users: User[], rootId: string }> = ({ use
                   <div className="min-w-fit min-h-fit flex justify-center origin-top pt-20">
                       <TreeNode userId={viewRootId} depth={0} />
                   </div>
-              </div>
-
-              {/* TACTICAL HUD COMMAND HUB */}
-              <div className="absolute bottom-10 left-10 flex flex-col items-center gap-1 z-40 animate-pop-in">
-                  <div className="bg-slate-950/80 backdrop-blur-2xl p-8 rounded-[3.5rem] border border-white/10 shadow-premium flex flex-col items-center gap-4 relative group/hud">
-                      {/* Decorative HUD Ring */}
-                      <div className="absolute inset-0 rounded-[3.5rem] border border-brand-lime/5 group-hover/hud:border-brand-lime/20 transition-colors pointer-events-none"></div>
-                      
-                      <button onClick={() => pan(0, 200)} className="mover-key group/btn" title="PAN_UP">
-                        <ChevronUp size={24}/>
-                        <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[6px] font-black opacity-0 group-hover/btn:opacity-50 tracking-widest">N</div>
-                      </button>
-                      
-                      <div className="flex gap-4">
-                        <button onClick={() => pan(200, 0)} className="mover-key group/btn" title="PAN_LEFT">
-                          <ChevronLeft size={24}/>
-                          <div className="absolute left-1 top-1/2 -translate-y-1/2 text-[6px] font-black opacity-0 group-hover/btn:opacity-50 tracking-widest rotate-[-90deg]">W</div>
-                        </button>
-                        
-                        <button onClick={resetView} className="mover-key !bg-brand-lime/10 border-brand-lime/20 text-brand-lime hover:!bg-brand-lime hover:!text-black group/center" title="RECALIBRATE_HUD">
-                          <RotateCcw size={20} className="group-hover/center:rotate-[-45deg] transition-transform"/>
-                        </button>
-                        
-                        <button onClick={() => pan(-200, 0)} className="mover-key group/btn" title="PAN_RIGHT">
-                          <ChevronRight size={24}/>
-                          <div className="absolute right-1 top-1/2 -translate-y-1/2 text-[6px] font-black opacity-0 group-hover/btn:opacity-50 tracking-widest rotate-[90deg]">E</div>
-                        </button>
-                      </div>
-                      
-                      <button onClick={() => pan(0, -200)} className="mover-key group/btn" title="PAN_DOWN">
-                        <ChevronDown size={24}/>
-                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[6px] font-black opacity-0 group-hover/btn:opacity-50 tracking-widest">S</div>
-                      </button>
-                      
-                      <div className="mt-2 space-y-1 text-center">
-                        <p className="text-[8px] text-slate-600 font-black uppercase tracking-[0.4em] font-tech leading-none">Navigation</p>
-                        <div className="flex items-center justify-center gap-1">
-                            <div className="w-1 h-1 rounded-full bg-brand-lime animate-pulse"></div>
-                            <span className="text-[6px] text-brand-lime/60 font-mono">STATUS: OK</span>
-                        </div>
-                      </div>
-                  </div>
-              </div>
-
-              {/* QUICK JUMP CONTROLS */}
-              <div className="absolute top-10 right-10 flex flex-col gap-3 z-40">
-                  <button onClick={() => setViewRootId(rootId)} className="bg-slate-900/80 backdrop-blur border border-white/10 p-4 rounded-2xl hover:bg-slate-800 hover:border-brand-lime/30 transition-all group flex items-center gap-3 text-slate-400 hover:text-white" title="Jump to Root">
-                      <ArrowUp size={20} /> <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover:inline">Top Node</span>
-                  </button>
-                  <button onClick={() => jumpToExtreme('LEFT')} className="bg-slate-900/80 backdrop-blur border border-white/10 p-4 rounded-2xl hover:bg-slate-800 hover:border-brand-lime/30 transition-all group flex items-center gap-3 text-slate-400 hover:text-white" title="Jump Bottom Left">
-                      <ArrowDownLeft size={20} /> <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover:inline">Bottom Left</span>
-                  </button>
-                  <button onClick={() => jumpToExtreme('RIGHT')} className="bg-slate-900/80 backdrop-blur border border-white/10 p-4 rounded-2xl hover:bg-slate-800 hover:border-brand-lime/30 transition-all group flex items-center gap-3 text-slate-400 hover:text-white" title="Jump Bottom Right">
-                      <ArrowDownRight size={20} /> <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover:inline">Bottom Right</span>
-                  </button>
               </div>
 
               <div className="absolute bottom-10 right-10 flex flex-col items-end gap-3 text-slate-600 font-mono text-[11px] pointer-events-none uppercase tracking-[0.2em] font-black">

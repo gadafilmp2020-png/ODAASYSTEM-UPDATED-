@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, User, SystemSettings, P2PRequest } from '../types';
 import { ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2, X, Loader2, ArrowRightLeft, Wallet as WalletIcon, Cpu, Info, ShieldCheck, AlertTriangle, Banknote, Upload, Send, ChevronDown, Lock, Coins, Building2, Hash, User as UserIcon, Smartphone, Fingerprint, Globe, QrCode } from 'lucide-react';
@@ -74,14 +75,26 @@ export const Wallet: React.FC<WalletProps> = ({
             // STRICT 2FA CHECK FOR SENDER
             if (!p2pForm.pin) { setError('2-Step Verification Code required.'); return; }
             if (user.twoFactorMethod === 'MANUAL' && p2pForm.pin !== user.twoFactorSecret) { setError('Invalid 2FA Code.'); return; }
-            if (user.twoFactorMethod !== 'MANUAL' && p2pForm.pin !== '123456') { /* Mock OTP check */ setError('Invalid Code.'); return; } // In prod, check dynamic OTP
+            if (user.twoFactorMethod !== 'MANUAL' && p2pForm.pin !== '123456') { /* Mock OTP check */ setError('Invalid Code.'); return; } 
         }
         setStep(2);
         return;
     }
     const amt = Number(formData.amount);
     if (isNaN(amt) || amt <= 0) { alert("Invalid Amount."); return; }
+    
     if (showModal === 'WITHDRAWAL') {
+        // 30-DAY WITHDRAWAL LOCK CHECK
+        const joinDate = new Date(user.joinDate);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - joinDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 30) {
+            setError(`Security Lock: Withdrawals are disabled for new accounts for the first 30 days. Days remaining: ${30 - diffDays}`);
+            return;
+        }
+
         const fee = systemSettings.withdrawalFeePercent || 2;
         if (amt * (1 + fee/100) > user.balance) { alert(`Insufficient Funds for Amount + ${fee}% Fee.`); return; }
     }
@@ -139,7 +152,6 @@ export const Wallet: React.FC<WalletProps> = ({
 
   const handleApproveRequest = (req: P2PRequest) => {
       if (!approvalPin) { alert("Enter 2FA Code"); return; }
-      // Verify PIN for Request Approval (Sender authorizing funds)
       if (user.twoFactorMethod === 'MANUAL' && approvalPin !== user.twoFactorSecret) { alert("Invalid 2FA Code"); return; }
       
       const fee = req.amount * (systemSettings.p2pFeePercent / 100);
@@ -155,7 +167,6 @@ export const Wallet: React.FC<WalletProps> = ({
   const pendingDeposit = userTransactions.find(t => t.type === 'DEPOSIT' && t.status === 'PENDING');
   const numAmount = Number(formData.amount) || 0;
   
-  // Filter P2P requests waiting for MY approval (I am the target of a REQUEST)
   const incomingRequests = p2pRequests.filter(r => r.type === 'REQUEST' && r.targetUserId === user.id && r.status === 'PENDING_SENDER');
 
   return (
@@ -183,7 +194,6 @@ export const Wallet: React.FC<WalletProps> = ({
         </div>
       </div>
 
-      {/* INCOMING REQUESTS SECTION */}
       {incomingRequests.length > 0 && (
           <div className="widget-card-2025 p-8 border-amber-500/30 bg-slate-900/40">
               <h3 className="text-amber-500 font-bold uppercase tracking-widest text-xs mb-6 flex items-center gap-2"><AlertTriangle size={16}/> Incoming Payment Requests</h3>
@@ -226,13 +236,37 @@ export const Wallet: React.FC<WalletProps> = ({
                       {showModal === 'SEND' || showModal === 'RECEIVE' ? (
                           step === 1 ? (
                               <form onSubmit={handleNextStep} className="space-y-6">
-                                  <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">{showModal === 'SEND' ? 'Receiver' : 'Sender'} Username</label><input required className="tech-input-new" value={p2pForm.targetUsername} onChange={e => setP2PForm({...p2pForm, targetUsername: e.target.value})} placeholder="Username" />{p2pTargetUser && <p className="text-[9px] text-emerald-500 pl-4 font-bold">VERIFIED: {p2pTargetUser.name}</p>}</div>
-                                  <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">Amount</label><input required type="number" className="tech-input-new" value={p2pForm.amount} onChange={e => setP2PForm({...p2pForm, amount: e.target.value})} placeholder="0.00" /></div>
+                                  <div className="space-y-2">
+                                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">{showModal === 'SEND' ? 'Receiver' : 'Sender'} Username</label>
+                                      <div className="relative group">
+                                          <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
+                                          <input required className="tech-input-new pl-12" value={p2pForm.targetUsername} onChange={e => setP2PForm({...p2pForm, targetUsername: e.target.value})} placeholder="Username" />
+                                      </div>
+                                      {p2pTargetUser && <p className="text-[9px] text-emerald-500 pl-4 font-bold">VERIFIED: {p2pTargetUser.name}</p>}
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">Amount</label>
+                                      <div className="relative group">
+                                          <Coins size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
+                                          <input required type="number" className="tech-input-new pl-12" value={p2pForm.amount} onChange={e => setP2PForm({...p2pForm, amount: e.target.value})} placeholder="0.00" />
+                                      </div>
+                                  </div>
+
                                   {showModal === 'SEND' && (
-                                      <div className="space-y-2">
-                                          <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4 flex items-center gap-2"><Lock size={10}/> 2-Step Verification</label>
-                                          <input required type="password" className="tech-input-new text-center tracking-[0.5em] font-mono text-amber-500" value={p2pForm.pin} onChange={e => setP2PForm({...p2pForm, pin: e.target.value})} placeholder="******" maxLength={6} />
-                                          <p className="text-[8px] text-slate-600 pl-4">Enter your 2FA Code to authorize transfer.</p>
+                                      <div className="space-y-4 bg-amber-900/10 p-4 rounded-2xl border border-amber-500/20">
+                                          <div className="flex items-start gap-2 text-[9px] text-amber-500 font-bold uppercase tracking-wide">
+                                              <AlertTriangle size={14} className="shrink-0" />
+                                              <p>Security Verification Required</p>
+                                          </div>
+                                          <div className="space-y-2">
+                                              <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-1">2-Step Code</label>
+                                              <div className="relative group">
+                                                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 group-focus-within:text-amber-500 transition-colors" />
+                                                  <input required type="password" className="tech-input-new pl-12 text-center tracking-[0.5em] font-mono text-amber-500 border-amber-500/30 focus:border-amber-500" value={p2pForm.pin} onChange={e => setP2PForm({...p2pForm, pin: e.target.value})} placeholder="******" maxLength={6} />
+                                              </div>
+                                              <p className="text-[8px] text-slate-600 text-center">Enter your security PIN to authorize this transfer.</p>
+                                          </div>
                                       </div>
                                   )}
                                   {error && <p className="text-red-500 text-[10px] font-bold bg-red-900/20 p-2 rounded">{error}</p>}
@@ -248,7 +282,6 @@ export const Wallet: React.FC<WalletProps> = ({
                               </div>
                           )
                       ) : (
-                          // Deposit / Withdrawal Logic (Existing)
                           step === 1 ? (
                               <form onSubmit={handleNextStep} className="space-y-6">
                                   <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-8">Amount (OTF)</label><div className="relative group"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30 transition-colors" size={20}/><input required type="number" className="tech-input-new pl-16 text-xl font-black" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" /></div></div>
@@ -259,12 +292,11 @@ export const Wallet: React.FC<WalletProps> = ({
                                       <div className="relative group"><UserIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs" value={formData.accountName} onChange={e => setFormData({...formData, accountName: e.target.value})} placeholder="Full Legal Name" /></div>
                                     </div>
                                   )}
+                                  {error && <div className="p-3 rounded-xl bg-red-900/20 text-red-400 text-[10px] font-bold border border-red-500/20 animate-bounce">{error}</div>}
                                   <button type="submit" className="w-full primary-gradient-new !rounded-[2.5rem]">Next</button>
                               </form>
                           ) : (
-                              // Confirmation Step
                               <div className="space-y-8 animate-fade-in text-center">
-                                  {/* Deposit Logic showing Bank Details if applicable */}
                                   {showModal === 'DEPOSIT' && pendingDeposit && pendingDeposit.depositStage === 'WAITING_PAYMENT' ? (
                                       <div className="space-y-6">
                                            <div className="bg-slate-900 p-6 rounded-3xl border border-white/5 space-y-3 font-mono text-xs"><p><span className="text-slate-600">BANK:</span> <span className="text-white uppercase">{systemSettings.bankName}</span></p><p><span className="text-slate-600">ACC:</span> <span className="text-brand-lime font-black">{systemSettings.accountNumber}</span></p></div>
@@ -272,7 +304,6 @@ export const Wallet: React.FC<WalletProps> = ({
                                            <button onClick={() => handleSubmitProof(pendingDeposit.id)} className="w-full py-4 primary-gradient-new text-black !rounded-[2.5rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-glow-lime">Submit Proof</button>
                                       </div>
                                   ) : (
-                                      // Standard Confirmation
                                       <div className="space-y-8">
                                           <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-brand-lime/20 shadow-inner"><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Final Amount</p><h4 className="text-4xl font-black text-white mt-4 font-tech">{numAmount.toLocaleString()} <span className="text-sm font-normal text-brand-lime">OTF</span></h4></div>
                                           <div className="flex items-center gap-3 p-4 bg-brand-lime/5 rounded-2xl border border-brand-lime/10 cursor-pointer" onClick={() => setConfirmCheck(!confirmCheck)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${confirmCheck ? 'bg-brand-lime border-brand-lime' : 'border-slate-700 bg-black/40'}`}>{confirmCheck && <CheckCircle2 size={12} className="text-black" />}</div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest select-none">Confirm this transaction</p></div>
@@ -281,7 +312,8 @@ export const Wallet: React.FC<WalletProps> = ({
                                   )}
                               </div>
                           )
-                      )}
+                      )
+                  }
                   </div>
               </div>
           </div>

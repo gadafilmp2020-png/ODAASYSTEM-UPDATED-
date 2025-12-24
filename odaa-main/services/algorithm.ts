@@ -1,3 +1,4 @@
+
 import { User, Transaction, SystemSettings, Rank } from '../types';
 import { REFERRAL_BONUS_PERCENT, MATCHING_BONUS_PERCENT } from '../constants';
 
@@ -66,6 +67,7 @@ export const processNewMemberLogic = (
     const JOINING_PV = settings.joiningFee; // 1 OTF = 1 PV
     const REF_BONUS = JOINING_PV * (settings.referralBonus > 0 ? (settings.referralBonus/1000) : REFERRAL_BONUS_PERCENT); // Fallback logic
     const LEVEL_PERCENTAGES = [0.05, 0.04, 0.03, 0.02, 0.01]; // Level 1-5
+    const MAX_PAIRS = settings.maxDailyBinaryPairs || 20; // Default to 20 pairs
 
     // --- PHASE 1: COMPANY REVENUE ---
     const admin = Array.from(usersMap.values()).find(u => u.role === 'ADMIN');
@@ -139,7 +141,7 @@ export const processNewMemberLogic = (
         }
     }
 
-    // --- PHASE 3: BINARY ENGINE (Volume & Flushing) ---
+    // --- PHASE 3: BINARY ENGINE (Volume & Flushing with Pair Cap) ---
     let currentNode = newUser;
     let safetyCounter = 0;
 
@@ -158,45 +160,85 @@ export const processNewMemberLogic = (
         }
 
         // 2. Calculate Matching (10% of Weak Leg)
-        // Note: Using Volume, not Count.
         const leftVol = parent.binaryLeftVolume;
         const rightVol = parent.binaryRightVolume;
         
-        // Find matchable volume
+        // Find potential matchable volume
         const matchable = Math.min(leftVol, rightVol);
         
         if (matchable > 0) {
-            const binaryBonus = matchable * MATCHING_BONUS_PERCENT; // 10%
-            
-            // Check Daily Cap
+            // Check Daily Cap (Pairs Count)
+            if (!parent.dailyBinaryPairs || parent.dailyBinaryPairs.date !== date) {
+                parent.dailyBinaryPairs = { date, count: 0 };
+            }
             if (!parent.dailyBinaryEarnings || parent.dailyBinaryEarnings.date !== date) {
                 parent.dailyBinaryEarnings = { date, amount: 0 };
             }
+
+            // A "Pair" is typically defined as 1 Unit of volume match (e.g. 1000 PV vs 1000 PV)
+            // Or simpler: Number of times this logic runs successfully per day.
+            // Here we treat matchable / JOINING_PV as number of pairs approximately
+            // But realistically, if matchable > 0, we have a match event.
             
-            const remainingCap = Math.max(0, settings.binaryDailyCap - parent.dailyBinaryEarnings.amount);
-            const payout = Math.min(binaryBonus, remainingCap);
+            // To be precise with "20 Pairs":
+            // We need to track how many 'units' of matching happened. 
+            // Assuming 1000 PV = 1 Pair.
+            
+            // Current matched so far:
+            const currentPairs = parent.dailyBinaryPairs.count;
+            
+            // Can we pay?
+            if (currentPairs < MAX_PAIRS) {
+                const binaryBonus = matchable * MATCHING_BONUS_PERCENT; // 10%
+                
+                // Double check monetary cap too (optional, from settings)
+                const remainingMonetaryCap = Math.max(0, settings.binaryDailyCap - parent.dailyBinaryEarnings.amount);
+                const payout = Math.min(binaryBonus, remainingMonetaryCap);
 
-            if (payout > 0) {
-                parent.balance += payout;
-                parent.totalEarnings += payout;
-                parent.dailyBinaryEarnings.amount += payout;
+                if (payout > 0) {
+                    parent.balance += payout;
+                    parent.totalEarnings += payout;
+                    parent.dailyBinaryEarnings.amount += payout;
+                    parent.dailyBinaryPairs.count += 1; // Increment pair count
 
-                // 3. FLUSHING MECHANISM
-                // Deduct the matched volume from both legs
+                    // 3. FLUSHING MECHANISM
+                    // Deduct the matched volume from both legs
+                    parent.binaryLeftVolume -= matchable;
+                    parent.binaryRightVolume -= matchable;
+                    parent.binaryPaidVolume = (parent.binaryPaidVolume || 0) + matchable;
+
+                    newTx.push({
+                        id: `bin-${parent.id}-${Date.now()}-${safetyCounter}`,
+                        userId: parent.id,
+                        userName: parent.name,
+                        type: 'MATCHING_BONUS',
+                        amount: payout,
+                        date,
+                        status: 'APPROVED',
+                        description: `Binary Match: ${matchable} PV (${parent.dailyBinaryPairs.count}/${MAX_PAIRS} Daily Pairs)`
+                    });
+                }
+            } else {
+                // CAP REACHED: Flush points but DO NOT PAY
+                // This is standard "Flush" logic when cap is hit
                 parent.binaryLeftVolume -= matchable;
                 parent.binaryRightVolume -= matchable;
-                parent.binaryPaidVolume = (parent.binaryPaidVolume || 0) + matchable;
-
+                // We don't add to paid volume usually if not paid, or we do to show it flushed.
+                // Let's log it but 0 amount.
+                
+                // Optional: Log capped transaction
+                /*
                 newTx.push({
-                    id: `bin-${parent.id}-${Date.now()}-${safetyCounter}`,
+                    id: `bin-cap-${parent.id}-${Date.now()}`,
                     userId: parent.id,
                     userName: parent.name,
                     type: 'MATCHING_BONUS',
-                    amount: payout,
+                    amount: 0,
                     date,
-                    status: 'APPROVED',
-                    description: `Binary Match: ${matchable} PV Flushed ${payout < binaryBonus ? '(CAPPED)' : ''}`
+                    status: 'REJECTED',
+                    description: `Binary Capped: Max ${MAX_PAIRS} Pairs Reached`
                 });
+                */
             }
         }
 

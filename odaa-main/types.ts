@@ -29,7 +29,9 @@ export interface SystemSettings {
   levelIncomeBonus: number;
   p2pFeePercent: number;
   withdrawalFeePercent: number;
-  binaryDailyCap: number;
+  binaryDailyCap: number; // Monetary Cap
+  maxDailyBinaryPairs: number; // Pair Count Cap (e.g., 20)
+  
   honeyValue: number;
   coffeeValue: number;
   allowRegistrations: boolean;
@@ -38,18 +40,36 @@ export interface SystemSettings {
   maintenanceMode: boolean;
   systemAnnouncement: string;
   supportEmail: string;
+  
+  // Bank Details
   bankName: string;
   accountNumber: string;
   accountName: string;
+  
+  // Mobile Money (New)
+  mobileMoneyName?: string; // e.g., Telebirr, M-Pesa
+  mobileMoneyNumber?: string;
+  
   minOTFSell: number;
   maxOTFSell: number;
   minOTFBuy: number;
   maxOTFBuy: number;
   minOTFRateETB: number;
   maxOTFRateETB: number;
+  
+  // Time & Limiting Configuration (New)
+  opsStartTime?: string;
+  opsEndTime?: string;
+  minWithdrawal?: number;
+  maxWithdrawal?: number;
+  minAccountAgeDays?: number;
+  p2pDailyLimit?: number;
+
+  // Crypto
   cryptoExchangeName: string;
   cryptoWalletAddress: string;
   cryptoNetwork: string;
+  
   securityCooldownHours: number;
   tradeCooldownMinutes: number;
 }
@@ -108,6 +128,8 @@ export interface User {
   careerVolume: number;
   
   dailyBinaryEarnings?: { date: string; amount: number };
+  dailyBinaryPairs?: { date: string; count: number }; // Added for 20 pair limit
+  
   placementType?: 'AUTO' | 'MANUAL';
   allowedDeviceIds?: string[];
   isTwoFactorEnabled?: boolean;
@@ -129,6 +151,7 @@ export interface User {
   lastActive?: string;
   ownedNFTs?: string[];
   bio?: string;
+  riskScore?: number;
 }
 
 export interface VerificationRequest {

@@ -74,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       `}>
         
         <div className="p-8 pb-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-4 group cursor-pointer">
+          <div className="flex items-center gap-4 group cursor-pointer" onClick={() => setView('DASHBOARD')}>
             <div className="p-2.5 bg-brand-lime/10 rounded-2xl border border-brand-lime/20 group-hover:scale-110 transition-all duration-500">
                <OdaaLogo size={32} className="text-brand-lime" />
             </div>
@@ -82,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                  <span className="text-2xl text-white font-bold tracking-tight font-tech">ODAA</span>
                  <span className="text-[7px] uppercase tracking-[0.6em] font-black text-brand-lime leading-none">BUSINESS_SYSTEM</span>
             </div>
-          </Link>
+          </div>
           <button onClick={onClose} className="md:hidden text-slate-500 hover:text-brand-lime p-2">
             <X size={24} />
           </button>
@@ -130,18 +130,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="w-full flex justify-start">
              <LanguageSelector />
           </div>
-
-          <Link 
-            to="/"
-            className="w-full flex items-center justify-between px-5 py-3 rounded-2xl text-slate-500 hover:text-brand-lime hover:bg-white/5 transition-all group border border-transparent hover:border-white/5"
-          >
-            <div className="flex items-center gap-5 w-full">
-                <Globe size={18} className="group-hover:rotate-12 transition-transform" />
-                <span className="text-[11px] font-black uppercase tracking-widest font-tech flex-1 text-left">
-                  {t('publicWebsite')}
-                </span>
-            </div>
-          </Link>
 
           <button 
             onClick={toggleTheme}

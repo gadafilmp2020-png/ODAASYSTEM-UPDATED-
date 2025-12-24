@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, PendingRegistration, SystemSettings } from '../types';
-import { AlertTriangle, Wallet, CheckCircle2, ShieldCheck, Fingerprint, Network, CreditCard, Landmark as BankIcon, User as UserIcon, Phone, Lock, Hash, AtSign, UserCircle, GitBranch, Loader2, Eye, EyeOff, Tag, Compass, Mail } from 'lucide-react';
-import { OTF_VALUE_ETB } from '../constants';
+import { AlertTriangle, Wallet, CheckCircle2, ShieldCheck, Fingerprint, Network, CreditCard, Landmark as BankIcon, User as UserIcon, Phone, Lock, Hash, AtSign, UserCircle, GitBranch, Loader2, Eye, EyeOff, Tag, Compass, Mail, Bitcoin, Copy, Smartphone } from 'lucide-react';
+import { OTF_VALUE_ETB, COMPANY_CRYPTO_DETAILS } from '../constants';
 
 interface MemberRegistrationProps {
   currentUser: User;
@@ -12,7 +13,7 @@ interface MemberRegistrationProps {
 }
 
 export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentUser, usersList, systemSettings, isFTUsed, onRequestRegistration }) => {
-  const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'BANK'>('BANK');
+  const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'BANK' | 'CRYPTO'>('BANK');
   const [regForm, setRegForm] = useState({
     name: '', username: '', email: '', phoneNumber: '', password: '', confirmPassword: '', ftNumber: '', sponsorId: currentUser.id,
     placementMode: 'AUTO' as 'AUTO' | 'MANUAL', manualParentUsername: '', manualLeg: 'LEFT' as 'LEFT' | 'RIGHT'
@@ -22,11 +23,18 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // joiningFee is now directly in OTF as per requirements
   const joiningFeeOTF = systemSettings.joiningFee;
   const joiningFeeETB = joiningFeeOTF * OTF_VALUE_ETB;
   const hasEnoughBalance = currentUser.balance >= joiningFeeOTF;
+
+  const handleCopy = (text: string) => {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleRegSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +48,8 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
         return;
     }
 
-    if (paymentMethod === 'BANK' && isFTUsed && isFTUsed(regForm.ftNumber)) {
-        setRegError(`CRITICAL: FT Number ${regForm.ftNumber} has already been registered.`);
+    if ((paymentMethod === 'BANK' || paymentMethod === 'CRYPTO') && isFTUsed && isFTUsed(regForm.ftNumber)) {
+        setRegError(`CRITICAL: Reference Number ${regForm.ftNumber} has already been registered.`);
         setIsSubmitting(false);
         return;
     }
@@ -178,7 +186,7 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
                             <span className="text-[11px] font-bold uppercase tracking-widest">Payment Protocol</span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <button
                                 type="button"
                                 onClick={() => setPaymentMethod('BANK')}
@@ -192,6 +200,21 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
                                 </div>
                                 <h4 className={`text-sm font-bold uppercase tracking-wider ${paymentMethod === 'BANK' ? 'text-white' : 'text-slate-400'}`}>Bank Transfer</h4>
                                 <p className="text-[10px] text-slate-500 mt-2 font-mono">Manual verification via FT Number.</p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod('CRYPTO')}
+                                className={`p-6 rounded-3xl border transition-all text-left relative overflow-hidden group ${paymentMethod === 'CRYPTO' ? 'bg-amber-500/10 border-amber-500' : 'bg-black/40 border-white/5 hover:border-white/10'}`}
+                            >
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className={`p-3 rounded-xl ${paymentMethod === 'CRYPTO' ? 'bg-amber-500 text-black' : 'bg-slate-800 text-slate-500'}`}>
+                                        <Bitcoin size={24} />
+                                    </div>
+                                    {paymentMethod === 'CRYPTO' && <CheckCircle2 size={20} className="text-amber-500" />}
+                                </div>
+                                <h4 className={`text-sm font-bold uppercase tracking-wider ${paymentMethod === 'CRYPTO' ? 'text-white' : 'text-slate-400'}`}>Crypto</h4>
+                                <p className="text-[10px] text-slate-500 mt-2 font-mono">USDT/BTC Payment Verification.</p>
                             </button>
 
                             <button
@@ -210,7 +233,7 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
                             </button>
                         </div>
 
-                        {paymentMethod === 'BANK' ? (
+                        {paymentMethod === 'BANK' && (
                             <div className="space-y-6 bg-black/40 p-6 rounded-3xl border border-white/5 animate-fade-in">
                                  <div className="p-4 bg-slate-900/50 rounded-2xl border border-slate-800 space-y-2">
                                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bank Details</p>
@@ -241,7 +264,38 @@ export const MemberRegistration: React.FC<MemberRegistrationProps> = ({ currentU
                                     <input required={paymentMethod === 'BANK'} className="tech-input-new pl-12 font-mono" placeholder="Enter FT Transaction Number" value={regForm.ftNumber} onChange={e => setRegForm({...regForm, ftNumber: e.target.value})} />
                                 </div>
                             </div>
-                        ) : (
+                        )}
+
+                        {paymentMethod === 'CRYPTO' && (
+                            <div className="space-y-6 bg-black/40 p-6 rounded-3xl border border-white/5 animate-fade-in">
+                                 <div className="p-4 bg-slate-900/50 rounded-2xl border border-slate-800 space-y-4">
+                                     <div className="flex items-center gap-3 mb-2">
+                                         <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500"><Smartphone size={16}/></div>
+                                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Crypto Payment</span>
+                                     </div>
+                                     
+                                     <div className="bg-black/40 p-4 rounded-xl border border-white/5 flex items-center justify-between group cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => handleCopy(COMPANY_CRYPTO_DETAILS.walletAddress)}>
+                                         <div>
+                                             <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">{COMPANY_CRYPTO_DETAILS.exchange} • {COMPANY_CRYPTO_DETAILS.network}</p>
+                                             <p className="text-white font-mono text-xs mt-1 truncate max-w-[200px] md:max-w-xs">{COMPANY_CRYPTO_DETAILS.walletAddress}</p>
+                                         </div>
+                                         <div className="text-amber-500">{copied ? <CheckCircle2 size={16}/> : <Copy size={16}/>}</div>
+                                     </div>
+
+                                     <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-800">
+                                         <span className="text-slate-500 text-[10px] uppercase font-bold">Joining Fee</span>
+                                         <span className="text-white font-bold text-sm font-mono">{systemSettings.joiningFee.toLocaleString()} OTF</span>
+                                     </div>
+                                 </div>
+                                 
+                                 <div className="relative group/input">
+                                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 group-focus-within/input:text-amber-500" size={18} />
+                                    <input required={paymentMethod === 'CRYPTO'} className="tech-input-new pl-12 font-mono text-amber-500 focus:border-amber-500" placeholder="Enter Transaction Hash (TxID)" value={regForm.ftNumber} onChange={e => setRegForm({...regForm, ftNumber: e.target.value})} />
+                                </div>
+                            </div>
+                        )}
+
+                        {paymentMethod === 'WALLET' && (
                             <div className="space-y-6 bg-black/40 p-6 rounded-3xl border border-white/5 animate-fade-in">
                                 <div className="flex justify-between items-center p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
                                     <div>
