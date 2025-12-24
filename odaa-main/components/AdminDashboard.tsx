@@ -445,13 +445,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
            </div>
            
-           <div className="w-full md:w-auto overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
-               <div className="flex gap-2">
+           <div className="w-full">
+               <div className="flex flex-wrap gap-2 md:gap-3">
                    {tabs.map(t => (
                        <button 
                            key={t.id} 
                            onClick={() => setActiveTab(t.id as TabType)} 
-                           className={`px-5 py-3 rounded-xl text-xs font-bold transition-all duration-300 whitespace-nowrap flex items-center gap-2 border 
+                           className={`px-5 py-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 border 
                            ${activeTab === t.id 
                                 ? `bg-gradient-to-r ${t.style} ${t.border} text-white shadow-lg scale-[1.02]` 
                                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-slate-700'

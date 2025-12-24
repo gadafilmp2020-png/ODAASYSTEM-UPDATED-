@@ -24,21 +24,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 }) => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Sorting: Urgent (Error/Warning) -> Unread -> Date
   const sortedNotifications = useMemo(() => {
       return [...notifications].sort((a, b) => {
           const isUrgentA = a.type === 'ERROR' || a.type === 'WARNING';
           const isUrgentB = b.type === 'ERROR' || b.type === 'WARNING';
-          
-          // 1. Urgent First
           if (isUrgentA && !isUrgentB) return -1;
           if (!isUrgentA && isUrgentB) return 1;
-          
-          // 2. Unread Next
           if (!a.read && b.read) return -1;
           if (a.read && !b.read) return 1;
-          
-          // 3. Newest First
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
   }, [notifications]);
@@ -48,7 +41,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     switch (type) {
       case 'SUCCESS': return <CheckCircle2 className={`text-emerald-500 ${opacity}`} size={18} />;
       case 'WARNING': return <AlertTriangle className={`text-amber-500 ${opacity}`} size={18} />;
-      case 'ERROR': return <AlertTriangle className={`text-red-500 ${opacity}`} size={18} />; // Urgent
+      case 'ERROR': return <AlertTriangle className={`text-red-500 ${opacity}`} size={18} />;
       default: return <Info className={`text-lime-500 ${opacity}`} size={18} />;
     }
   };
@@ -68,35 +61,30 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       if (n.targetView) {
           onNavigate(n.targetView);
       }
+      onClose();
   };
 
   const getTimeAgo = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
     const diffInSecs = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
     if (diffInSecs < 60) return 'Just now';
     if (diffInSecs < 3600) return `${Math.floor(diffInSecs / 60)}m ago`;
     if (diffInSecs < 86400) return `${Math.floor(diffInSecs / 3600)}h ago`;
     return date.toLocaleDateString();
   };
 
+  // If not open, we render nothing to prevent click issues
+  if (!isOpen) return null;
+
   return (
     <>
-      {/* Backdrop */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] animate-fade-in" 
-          onClick={onClose}
-        />
-      )}
+      <div 
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] animate-fade-in" 
+        onClick={onClose}
+      />
 
-      {/* Slide-over Panel */}
-      <div className={`
-        fixed top-0 right-0 h-full w-full max-w-sm bg-slate-950 border-l border-lime-500/20 z-[100] shadow-[0_0_80px_rgba(132,204,22,0.2)] transition-transform duration-500 ease-in-out flex flex-col
-        ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-      `}>
-        {/* Header - Lime Theme */}
+      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-slate-950 border-l border-lime-500/20 z-[100] shadow-[0_0_80px_rgba(132,204,22,0.2)] flex flex-col animate-slide-in-right">
         <div className="p-6 border-b border-lime-900/30 flex items-center justify-between bg-gradient-to-r from-lime-950/20 to-slate-950">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-lime-500/10 rounded-xl text-lime-500 border border-lime-500/30 relative">
@@ -159,7 +147,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     <p className={`text-xs leading-relaxed transition-colors duration-300 ${n.read ? 'text-slate-500 font-light' : 'text-slate-200 font-medium'}`}>
                       {n.message}
                     </p>
-                    
                     {n.targetView && (
                         <div className="pt-2 flex items-center gap-1 text-[9px] font-bold text-lime-500 group-hover:text-lime-400 transition-colors uppercase tracking-wider">
                             <ExternalLink size={10} /> Open Source
