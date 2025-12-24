@@ -1,10 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Dashboard } from './Dashboard';
 import { GenealogyTree } from './GenealogyTree';
 import { Wallet } from './Wallet';
 import { Login } from './Login';
+import { AdminDashboard } from './AdminDashboard'; 
 import { Team } from './Team'; 
 import { BrandingPattern } from './BrandingPattern';
 import { SupportChat } from './SupportChat';
@@ -13,95 +15,250 @@ import { Marketplace } from './Marketplace';
 import { MemberRegistration } from './MemberRegistration';
 import { NotificationCenter } from './NotificationCenter';
 import { SecurityView } from './SecurityView';
-import { ViewState } from '../types';
-import { Menu, Bell } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
-import { api } from '../services/api';
+import { ViewState, User, Transaction, Notification, PendingRegistration, ActivityLog, P2PRequest, PasswordResetRequest, DeviceApprovalRequest, SystemSettings, ChatMessage, SystemBackup, VerificationRequest, Rank, MarketOrder, ActiveTrade } from '../types';
+import { Menu, Bell, ArrowLeft } from 'lucide-react';
+import { MOCK_USERS, MOCK_TRANSACTIONS, REFERRAL_BONUS_AMOUNT, MATCHING_BONUS_AMOUNT, JOINING_FEE_AMOUNT } from '../constants';
+import { generateAIResponse } from '../services/geminiService';
+import { processNewMemberLogic, findAutoPlacement } from '../services/algorithm';
+
+const STORAGE_VERSION = 'v26_FULL_SYSTEM';
+
+const loadFromStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    const stored = localStorage.getItem(`${key}_${STORAGE_VERSION}`);
+    if (!stored) return fallback;
+    const parsed = JSON.parse(stored);
+    return parsed === null ? fallback : parsed;
+  } catch (e) {
+    return fallback;
+  }
+};
 
 export const System: React.FC<{ theme: 'dark' | 'light', toggleTheme: () => void }> = ({ theme, toggleTheme }) => {
-  const { currentUser, isAuthenticated, logout } = useUser();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   
-  // Data State
-  const [transactions, setTransactions] = useState([]);
-  const [systemSettings, setSystemSettings] = useState<any>({});
-  const [usersList, setUsersList] = useState([]); // For team/genealogy
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => loadFromStorage('odaa_settings', {
+    currencyRate: 1.19, joiningFee: JOINING_FEE_AMOUNT, referralBonus: REFERRAL_BONUS_AMOUNT, matchingBonus: MATCHING_BONUS_AMOUNT,
+    levelIncomeBonus: 5.00, p2pFeePercent: 2, withdrawalFeePercent: 5, binaryDailyCap: 5000, honeyValue: 1.25, coffeeValue: 1.25,
+    allowRegistrations: true, allowP2P: true, allowWithdrawals: true, maintenanceMode: false, systemAnnouncement: '', 
+    supportEmail: 'support@odaa.net', bankName: 'Commercial Bank of Ethiopia',
+    accountNumber: '1000998877665', accountName: 'Odaa Global Systems',
+    minOTFSell: 10, maxOTFSell: 10000, minOTFBuy: 10, maxOTFBuy: 10000,
+    minOTFRateETB: 0.5, maxOTFRateETB: 5.0,
+    cryptoExchangeName: 'Binance', cryptoWalletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', cryptoNetwork: 'BEP20 (BSC)',
+    securityCooldownHours: 48
+  }));
 
-  // Fetch Data on Load
+  const [allUsers, setAllUsers] = useState<User[]>(() => loadFromStorage('odaa_users', MOCK_USERS));
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>(() => loadFromStorage('odaa_tx', MOCK_TRANSACTIONS));
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>(() => loadFromStorage('odaa_preg', []));
+  const [notifications, setNotifications] = useState<Notification[]>(() => loadFromStorage('index_notif', []));
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadFromStorage('odaa_msgs', []));
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => loadFromStorage('odaa_logs', []));
+  const [kycRequests, setKycRequests] = useState<VerificationRequest[]>(() => loadFromStorage('index_kyc', []));
+  const [marketOrders, setMarketOrders] = useState<MarketOrder[]>(() => loadFromStorage('odaa_market', []));
+  const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>(() => loadFromStorage('odaa_trades', []));
+  const [usedFTNumbers, setUsedFTNumbers] = useState<string[]>(() => loadFromStorage('odaa_ft_registry', []));
+
   useEffect(() => {
-    if (isAuthenticated) {
-      const fetchData = async () => {
-        try {
-          const dashboardData = await api.getDashboardData();
-          setTransactions(dashboardData.transactions);
-          // In a real app, settings would come from API too
-          setSystemSettings({
-             currencyRate: 1.19, joiningFee: 1000, referralBonus: 150,
-             withdrawalFeePercent: 3, p2pFeePercent: 2,
-             bankName: 'Commercial Bank of Ethiopia', accountNumber: '1000998877665', accountName: 'Odaa Global Systems'
-          });
-          
-          if (currentView === 'GENEALOGY' || currentView === 'TEAM') {
-             const treeData = await api.getTree();
-             setUsersList(treeData);
-          }
-        } catch (e) {
-          console.error("Data fetch error", e);
-        }
+    const saveTimer = setTimeout(() => {
+      const data = {
+        odaa_settings: systemSettings, odaa_users: allUsers, odaa_tx: allTransactions,
+        odaa_preg: pendingRegistrations, index_notif: notifications, odaa_msgs: messages,
+        odaa_logs: activityLogs, index_kyc: kycRequests, odaa_market: marketOrders,
+        odaa_trades: activeTrades, odaa_ft_registry: usedFTNumbers
       };
-      fetchData();
-    }
-  }, [isAuthenticated, currentView]);
+      Object.entries(data).forEach(([key, val]) => {
+        localStorage.setItem(`${key}_${STORAGE_VERSION}`, JSON.stringify(val));
+      });
+    }, 1500); 
+    return () => clearTimeout(saveTimer);
+  }, [systemSettings, allUsers, allTransactions, pendingRegistrations, notifications, messages, activityLogs, kycRequests, marketOrders, activeTrades, usedFTNumbers]);
 
-  if (!isAuthenticated) return <Login />;
+  const handleUpdateUser = useCallback((userId: string, updates: Partial<User>) => {
+    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+    setCurrentUser(prev => (prev?.id === userId ? { ...prev, ...updates } : prev));
+  }, []);
+
+  const handleLogActivity = (userId: string, userName: string, action: ActivityLog['action'], details: string) => {
+      const log: ActivityLog = { id: `log-${Date.now()}`, userId, userName, action, details, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev]);
+  };
+
+  const handleSendMessage = async (text: string) => {
+      if(!currentUser) return;
+      const userMsg: ChatMessage = { id: `m-${Date.now()}`, senderId: currentUser.id, senderName: currentUser.name, recipientId: 'AI_SUPPORT', text, timestamp: new Date().toISOString(), read: true };
+      setMessages(prev => [...prev, userMsg]);
+
+      // Gemini AI Response
+      const history = messages.filter(m => m.senderId === currentUser.id || m.recipientId === currentUser.id);
+      const aiResponseText = await generateAIResponse(currentUser, history, text);
+      
+      const aiMsg: ChatMessage = { id: `m-${Date.now()+1}`, senderId: 'AI_SUPPORT', senderName: 'Gemini Agent', recipientId: currentUser.id, text: aiResponseText, timestamp: new Date().toISOString(), read: false };
+      setMessages(prev => [...prev, aiMsg]);
+  };
+
+  // --- REGISTRATION & ALGORITHM LOGIC ---
+  const handleRegisterUser = (userData: any) => {
+      const { placementMode, manualParentUsername, manualLeg, ...rest } = userData;
+      let parentId = 'admin1';
+      let leg: 'LEFT' | 'RIGHT' = 'LEFT';
+
+      if (placementMode === 'MANUAL' && manualParentUsername) {
+          const manualParent = allUsers.find(u => u.username === manualParentUsername);
+          if (manualParent) {
+              parentId = manualParent.id;
+              leg = manualLeg;
+          }
+      } else {
+          // Auto Placement
+          const sponsorId = userData.sponsorId || 'admin1';
+          const placement = findAutoPlacement(allUsers, sponsorId);
+          parentId = placement.parentId;
+          leg = placement.leg;
+      }
+
+      const newUser: User = {
+          ...rest,
+          id: `u-${Date.now()}`,
+          role: 'MEMBER',
+          joinDate: new Date().toISOString().split('T')[0],
+          rank: Rank.MEMBER,
+          parentId,
+          leg,
+          balance: 0,
+          totalEarnings: 0,
+          honeyBalance: 0,
+          coffeeBalance: 0,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=random`,
+          downlineCount: 0,
+          status: 'ACTIVE',
+          binaryLeftCount: 0,
+          binaryRightCount: 0,
+          binaryPaidPairs: 0,
+          kycStatus: 'NONE',
+          isOnline: false
+      };
+
+      // Run MLM Algorithm
+      const { updatedUsers, newTransactions } = processNewMemberLogic(newUser, allUsers, systemSettings);
+      
+      setAllUsers(updatedUsers);
+      setAllTransactions(prev => [...newTransactions, ...prev]);
+      handleLogActivity('admin1', 'System', 'REGISTRATION_APPROVAL', `Registered ${newUser.username}`);
+  };
+
+  const handleApproveRegistration = (regId: string) => {
+      const reg = pendingRegistrations.find(r => r.id === regId);
+      if (reg) {
+          handleRegisterUser(reg);
+          setPendingRegistrations(prev => prev.filter(r => r.id !== regId));
+          setUsedFTNumbers(prev => [...prev, reg.ftNumber]);
+      }
+  };
+
+  const handleLogin = (user: User, deviceId: string) => {
+    const updated = { ...user, isOnline: true, lastActive: new Date().toISOString() };
+    setAllUsers(prev => prev.map(u => u.id === user.id ? updated : u));
+    setCurrentUser(updated);
+    setIsAuthenticated(true);
+    setCurrentView(user.role === 'ADMIN' ? 'ADMIN_DASHBOARD' : 'DASHBOARD');
+  };
+
+  const handleLogout = () => {
+    if (currentUser) handleUpdateUser(currentUser.id, { isOnline: false });
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+  };
+
+  if (!isAuthenticated) return <Login onLogin={handleLogin} users={allUsers} />;
 
   return (
     <div className="min-h-screen relative text-slate-200 bg-brand-dark">
       <BrandingPattern />
-      
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-950/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-4 z-40">
           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-slate-400 hover:text-white"><Menu size={24}/></button>
           <div className="flex items-center gap-2"><OdaaLogo size={24}/><span className="font-bold font-tech text-white tracking-widest">ODAA</span></div>
           <button onClick={() => setIsNotificationOpen(true)} className="p-2 text-slate-400 hover:text-brand-lime relative">
               <Bell size={20}/>
+              {notifications.some(n => !n.read) && <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>}
           </button>
       </div>
 
       <Sidebar 
-        currentView={currentView} setView={setCurrentView} role={currentUser?.role || 'MEMBER'} onLogout={logout} 
+        currentView={currentView} setView={setCurrentView} role={currentUser?.role || 'MEMBER'} onLogout={handleLogout} 
         isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} theme={theme} toggleTheme={toggleTheme} 
+        notificationCount={notifications.filter(n => !n.read).length} adminActionCount={pendingRegistrations.length + kycRequests.length}
       />
       
       <NotificationCenter 
-         notifications={[]} 
+         notifications={notifications.filter(n => n.userId === currentUser?.id || currentUser?.role === 'ADMIN')}
          isOpen={isNotificationOpen} 
          onClose={() => setIsNotificationOpen(false)}
-         onMarkRead={() => {}} onMarkAllRead={() => {}} onClearAll={() => {}}
+         onMarkRead={id => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))} 
+         onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))} 
+         onClearAll={() => setNotifications([])}
          onNavigate={setCurrentView}
       />
 
-      <main className="md:ml-80 p-6 pt-20 md:pt-8 relative z-10 min-h-screen transition-all duration-300">
+      <main className="md:ml-72 p-6 pt-24 md:pt-8 relative z-10 min-h-screen transition-all duration-300">
         <div className="max-w-7xl mx-auto">
-          {currentView === 'DASHBOARD' && currentUser && (
+          {currentView === 'DASHBOARD' && (
             <Dashboard 
-                user={currentUser} usersList={usersList} transactions={transactions} 
-                systemSettings={systemSettings} onUpdateProfile={() => {}}
-                onViewChange={setCurrentView}
+                user={currentUser!} usersList={allUsers} transactions={allTransactions} 
+                systemSettings={systemSettings} onUpdateProfile={u => handleUpdateUser(currentUser!.id, u)}
+                onViewChange={setCurrentView} onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser!.id} as PendingRegistration, ...p])}
             />
           )}
-          {currentView === 'GENEALOGY' && currentUser && <GenealogyTree users={usersList} rootId={currentUser.id} />}
-          {currentView === 'TEAM' && currentUser && <Team currentUser={currentUser} allUsers={usersList} />}
-          {currentView === 'WALLET' && currentUser && (
+          
+          {currentView === 'ADMIN_DASHBOARD' && currentUser?.role === 'ADMIN' && (
+            <AdminDashboard 
+                users={allUsers} setUsers={setAllUsers} transactions={allTransactions} setTransactions={setAllTransactions} 
+                addNotification={(uid, msg, type) => setNotifications(p => [{ id: `n${Date.now()}`, userId: uid, message: msg, type, date: new Date().toISOString(), read: false }, ...p])} 
+                systemSettings={systemSettings} setSystemSettings={setSystemSettings} 
+                pendingRegistrations={pendingRegistrations} setPendingRegistrations={setPendingRegistrations}
+                verificationRequests={kycRequests} onApproveVerification={id => { setKycRequests(p => p.filter(k => k.id !== id)); const req = kycRequests.find(k => k.id === id); if(req) handleUpdateUser(req.userId, { kycStatus: 'VERIFIED', kycData: req }); }}
+                onRejectVerification={(id, reason) => { setKycRequests(p => p.filter(k => k.id !== id)); const req = kycRequests.find(k => k.id === id); if(req) handleUpdateUser(req.userId, { kycStatus: 'REJECTED' }); }}
+                activityLogs={activityLogs} onLogActivity={handleLogActivity}
+                onUpdateUser={handleUpdateUser} onResetSystem={() => { localStorage.clear(); window.location.reload(); }}
+                onRegisterUser={handleRegisterUser} onApproveRegistration={handleApproveRegistration}
+                onRestoreSystem={(backup) => { 
+                    setAllUsers(backup.data.users); setAllTransactions(backup.data.transactions); setSystemSettings(backup.data.settings); 
+                    setActivityLogs(backup.data.logs); setPendingRegistrations(backup.data.pendingRegistrations);
+                    alert("System Restored"); 
+                }}
+            />
+          )}
+          
+          {currentView === 'WALLET' && (
             <Wallet 
-                user={currentUser} transactions={transactions} 
-                onAddTransaction={() => {}} systemSettings={systemSettings}
+                user={currentUser!} allUsers={allUsers} transactions={allTransactions} 
+                onAddTransaction={t => { setAllTransactions(p => [t, ...p]); handleLogActivity(currentUser!.id, currentUser!.name, 'TRANSACTION_REQUEST', `Type: ${t.type}, Amount: ${t.amount}`); }} 
+                onUpdateTransaction={(id, updates) => setAllTransactions(p => p.map(t => t.id === id ? { ...t, ...updates } : t))}
+                systemSettings={systemSettings} isFTUsed={ft => usedFTNumbers.includes(ft)}
             />
           )}
-          {currentView === 'SECURITY' && currentUser && <SecurityView user={currentUser} onUpdateSettings={() => {}} onReportPasswordReset={() => {}} />}
+          {currentView === 'MARKETPLACE' && (
+            <Marketplace 
+                currentUser={currentUser!} allUsers={allUsers} systemSettings={systemSettings}
+                marketOrders={marketOrders} activeTrades={activeTrades} 
+                onPlaceOrder={o => setMarketOrders(p => [...p, o])}
+                onInitiateTrade={t => setActiveTrades(p => [...p, t])}
+                onTradeAction={(tid, act, pay) => setActiveTrades(trades => trades.map(t => t.id === tid ? { ...t, status: act === 'PAYMENT' ? 'PAID_VERIFYING' : act === 'RELEASE' ? 'COMPLETED' : 'CANCELLED', ftNumber: pay || t.ftNumber } : t))}
+                isFTUsed={ft => usedFTNumbers.includes(ft)}
+            />
+          )}
+          {currentView === 'GENEALOGY' && <GenealogyTree users={allUsers} rootId={currentUser!.id} />}
+          {currentView === 'TEAM' && <Team currentUser={currentUser!} allUsers={allUsers} />}
+          {currentView === 'SECURITY' && <SecurityView user={currentUser!} onUpdateSettings={handleUpdateUser} onReportPasswordReset={u => alert("Reset Request Sent")} onKycSubmission={k => setKycRequests(p => [{ ...k, id: `k${Date.now()}`, userId: currentUser!.id, username: currentUser!.username, timestamp: new Date().toISOString(), status: 'PENDING' } as VerificationRequest, ...p])} />}
+          {currentView === 'REGISTER' && <MemberRegistration currentUser={currentUser!} usersList={allUsers} systemSettings={systemSettings} onRequestRegistration={r => setPendingRegistrations(p => [{...r, id: `pr${Date.now()}`, date: new Date().toISOString(), requestedBy: currentUser!.id} as PendingRegistration, ...p])} />}
         </div>
       </main>
+      {currentUser?.role !== 'ADMIN' && <SupportChat currentUser={currentUser!} messages={messages} onSendMessage={handleSendMessage} isSupportOnline={allUsers.some(u => u.role === 'ADMIN' && u.isOnline)} />}
     </div>
   );
 };

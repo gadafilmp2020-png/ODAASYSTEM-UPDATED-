@@ -9,9 +9,14 @@ const daysAgo = (days: number) => {
 };
 
 export const ADMIN_USER_ID = 'admin1';
+export const JOINING_FEE_AMOUNT = 1000.00; // 1000 OTF = 1000 PV
 export const REFERRAL_BONUS_PERCENT = 0.15; // 15% Direct Referral
 export const MATCHING_BONUS_PERCENT = 0.10; // 10% Binary Match of Weak Leg
-export const JOINING_FEE_AMOUNT = 1000.00; // 1000 OTF = 1000 PV
+
+// Fix: Exports required by System.tsx
+export const REFERRAL_BONUS_AMOUNT = JOINING_FEE_AMOUNT * REFERRAL_BONUS_PERCENT;
+export const MATCHING_BONUS_AMOUNT = JOINING_FEE_AMOUNT * MATCHING_BONUS_PERCENT;
+
 export const INITIAL_COMPANY_CAPITAL = 100000;
 export const OTF_VALUE_ETB = 1.19; // Official Rate
 
