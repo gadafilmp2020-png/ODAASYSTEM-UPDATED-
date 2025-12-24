@@ -1,39 +1,22 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, Role } from '../types';
-import { MOCK_USERS } from '../constants';
+import { User } from '../types';
+import { api } from '../services/api';
 
-// Key for LocalStorage
-const STORAGE_KEY_USERS = 'odaa_users_v30_ALGO_REFACTOR';
 const STORAGE_KEY_SESSION = 'odaa_session_v30';
 
 interface UserContextType {
   currentUser: User | null;
-  allUsers: User[];
   isAuthenticated: boolean;
-  login: (user: User, deviceId: string) => void;
+  login: (credentials: any) => Promise<void>;
   logout: () => void;
-  updateUser: (userId: string, updates: Partial<User>) => void;
-  registerUser: (newUser: User) => void;
-  setAllUsers: React.Dispatch<React.SetStateAction<User[]>>;
-  refreshSession: () => void;
+  registerUser: (data: any) => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load Users from Storage or use Mocks
-  const [allUsers, setAllUsers] = useState<User[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_USERS);
-      return stored ? JSON.parse(stored) : MOCK_USERS;
-    } catch (e) {
-      console.error("Failed to load users", e);
-      return MOCK_USERS;
-    }
-  });
-
-  // Load Session
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SESSION);
@@ -43,73 +26,47 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Derived state to ensure synchronization with currentUser
   const isAuthenticated = !!currentUser;
 
-  // Persist Users whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(allUsers));
-  }, [allUsers]);
-
-  // Persist Session whenever current user changes
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEY_SESSION);
+  const login = useCallback(async (credentials: any) => {
+    try {
+      const data = await api.login(credentials);
+      // Backend returns { ...user, token }
+      setCurrentUser(data);
+      localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(data));
+    } catch (error) {
+      throw error;
     }
-  }, [currentUser]);
+  }, []);
 
-  const login = useCallback((user: User, deviceId: string) => {
-    const updatedUser = { 
-        ...user, 
-        isOnline: true, 
-        lastActive: new Date().toISOString() 
-    };
-    
-    // Update in the main list
-    setAllUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
-    setCurrentUser(updatedUser);
+  const registerUser = useCallback(async (data: any) => {
+    await api.register(data);
   }, []);
 
   const logout = useCallback(() => {
-    if (currentUser) {
-        // Mark offline in list
-        setAllUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, isOnline: false } : u));
-    }
+    localStorage.removeItem(STORAGE_KEY_SESSION);
     setCurrentUser(null);
-  }, [currentUser]);
-
-  const updateUser = useCallback((userId: string, updates: Partial<User>) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
-    
-    // If updating the currently logged in user, update local state too
-    if (currentUser && currentUser.id === userId) {
-        setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
-    }
-  }, [currentUser]);
-
-  const registerUser = useCallback((newUser: User) => {
-      setAllUsers(prev => [...prev, newUser]);
   }, []);
 
-  const refreshSession = useCallback(() => {
-      if (currentUser) {
-          const freshData = allUsers.find(u => u.id === currentUser.id);
-          if (freshData) setCurrentUser(freshData);
+  const refreshSession = useCallback(async () => {
+    if (currentUser) {
+      try {
+        const data = await api.getDashboardData();
+        setCurrentUser(prev => ({ ...prev, ...data.user }));
+      } catch (e) {
+        // If token invalid, logout
+        logout();
       }
-  }, [currentUser, allUsers]);
+    }
+  }, [currentUser, logout]);
 
   return (
     <UserContext.Provider value={{ 
         currentUser, 
-        allUsers, 
         isAuthenticated, 
         login, 
         logout, 
-        updateUser, 
         registerUser, 
-        setAllUsers,
         refreshSession
     }}>
       {children}

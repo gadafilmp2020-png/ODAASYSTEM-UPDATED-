@@ -166,8 +166,99 @@ export const Wallet: React.FC<WalletProps> = ({
 
   const pendingDeposit = userTransactions.find(t => t.type === 'DEPOSIT' && t.status === 'PENDING');
   const numAmount = Number(formData.amount) || 0;
-  
   const incomingRequests = p2pRequests.filter(r => r.type === 'REQUEST' && r.targetUserId === user.id && r.status === 'PENDING_SENDER');
+
+  // Render Helpers
+  const renderP2PContent = () => {
+      if (step === 1) {
+          return (
+              <form onSubmit={handleNextStep} className="space-y-6">
+                  <div className="space-y-2">
+                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">{showModal === 'SEND' ? 'Receiver' : 'Sender'} Username</label>
+                      <div className="relative group">
+                          <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
+                          <input required className="tech-input-new pl-12" value={p2pForm.targetUsername} onChange={e => setP2PForm({...p2pForm, targetUsername: e.target.value})} placeholder="Username" />
+                      </div>
+                      {p2pTargetUser && <p className="text-[9px] text-emerald-500 pl-4 font-bold">VERIFIED: {p2pTargetUser.name}</p>}
+                  </div>
+                  
+                  <div className="space-y-2">
+                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">Amount</label>
+                      <div className="relative group">
+                          <Coins size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
+                          <input required type="number" className="tech-input-new pl-12" value={p2pForm.amount} onChange={e => setP2PForm({...p2pForm, amount: e.target.value})} placeholder="0.00" />
+                      </div>
+                  </div>
+
+                  {showModal === 'SEND' && (
+                      <div className="space-y-4 bg-amber-900/10 p-4 rounded-2xl border border-amber-500/20">
+                          <div className="flex items-start gap-2 text-[9px] text-amber-500 font-bold uppercase tracking-wide">
+                              <AlertTriangle size={14} className="shrink-0" />
+                              <p>Security Verification Required</p>
+                          </div>
+                          <div className="space-y-2">
+                              <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-1">2-Step Code</label>
+                              <div className="relative group">
+                                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 group-focus-within:text-amber-500 transition-colors" />
+                                  <input required type="password" className="tech-input-new pl-12 text-center tracking-[0.5em] font-mono text-amber-500 border-amber-500/30 focus:border-amber-500" value={p2pForm.pin} onChange={e => setP2PForm({...p2pForm, pin: e.target.value})} placeholder="******" maxLength={6} />
+                              </div>
+                              <p className="text-[8px] text-slate-600 text-center">Enter your security PIN to authorize this transfer.</p>
+                          </div>
+                      </div>
+                  )}
+                  {error && <p className="text-red-500 text-[10px] font-bold bg-red-900/20 p-2 rounded">{error}</p>}
+                  <button type="submit" className="w-full primary-gradient-new !rounded-[2.5rem]">Next</button>
+              </form>
+          );
+      } else {
+          return (
+              <div className="space-y-6 text-center">
+                  <div className="p-6 bg-slate-900 rounded-3xl border border-white/5"><p className="text-slate-500 text-[10px] uppercase font-bold">Total {showModal === 'SEND' ? 'Sent' : 'Requested'}</p><h3 className="text-3xl font-black text-white font-tech">{p2pForm.amount} OTF</h3>
+                  {showModal === 'SEND' && <p className="text-amber-500 text-[10px] font-bold mt-1">+ {(Number(p2pForm.amount) * systemSettings.p2pFeePercent/100).toFixed(2)} Fee</p>}
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-brand-lime/5 rounded-2xl cursor-pointer" onClick={() => setConfirmCheck(!confirmCheck)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${confirmCheck ? 'bg-brand-lime border-brand-lime' : 'border-slate-700'}`}>{confirmCheck && <CheckCircle2 size={12} className="text-black" />}</div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Confirm Transaction</p></div>
+                  <button disabled={!confirmCheck || processing} onClick={handleConfirmTransaction} className="w-full py-5 primary-gradient-new text-black !rounded-[2.5rem] flex items-center justify-center gap-3">{processing ? <Loader2 className="animate-spin"/> : <Send size={16}/>} Execute</button>
+              </div>
+          );
+      }
+  };
+
+  const renderStandardContent = () => {
+      if (step === 1) {
+          return (
+              <form onSubmit={handleNextStep} className="space-y-6">
+                  <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-8">Amount (OTF)</label><div className="relative group"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30 transition-colors" size={20}/><input required type="number" className="tech-input-new pl-16 text-xl font-black" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" /></div></div>
+                  {showModal === 'WITHDRAWAL' && (
+                    <div className="space-y-3 animate-slide-in-right border-t border-white/5 pt-4">
+                      <div className="relative group"><Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} placeholder="Bank Name" /></div>
+                      <div className="relative group"><Hash className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs font-mono" value={formData.accountNumber} onChange={e => setFormData({...formData, accountNumber: e.target.value})} placeholder="Account Number" /></div>
+                      <div className="relative group"><UserIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs" value={formData.accountName} onChange={e => setFormData({...formData, accountName: e.target.value})} placeholder="Full Legal Name" /></div>
+                    </div>
+                  )}
+                  {error && <div className="p-3 rounded-xl bg-red-900/20 text-red-400 text-[10px] font-bold border border-red-500/20 animate-bounce">{error}</div>}
+                  <button type="submit" className="w-full primary-gradient-new !rounded-[2.5rem]">Next</button>
+              </form>
+          );
+      } else {
+          return (
+              <div className="space-y-8 animate-fade-in text-center">
+                  {showModal === 'DEPOSIT' && pendingDeposit && pendingDeposit.depositStage === 'WAITING_PAYMENT' ? (
+                      <div className="space-y-6">
+                           <div className="bg-slate-900 p-6 rounded-3xl border border-white/5 space-y-3 font-mono text-xs"><p><span className="text-slate-600">BANK:</span> <span className="text-white uppercase">{systemSettings.bankName}</span></p><p><span className="text-slate-600">ACC:</span> <span className="text-brand-lime font-black">{systemSettings.accountNumber}</span></p></div>
+                           <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-8">Transaction Reference</label><div className="relative group"><Hash className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 font-mono text-xl text-amber-500 tracking-widest" placeholder="Reference ID" value={formData.ftNumber} onChange={e => setFormData({...formData, ftNumber: e.target.value})} /></div></div>
+                           <button onClick={() => handleSubmitProof(pendingDeposit.id)} className="w-full py-4 primary-gradient-new text-black !rounded-[2.5rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-glow-lime">Submit Proof</button>
+                      </div>
+                  ) : (
+                      <div className="space-y-8">
+                          <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-brand-lime/20 shadow-inner"><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Final Amount</p><h4 className="text-4xl font-black text-white mt-4 font-tech">{numAmount.toLocaleString()} <span className="text-sm font-normal text-brand-lime">OTF</span></h4></div>
+                          <div className="flex items-center gap-3 p-4 bg-brand-lime/5 rounded-2xl border border-brand-lime/10 cursor-pointer" onClick={() => setConfirmCheck(!confirmCheck)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${confirmCheck ? 'bg-brand-lime border-brand-lime' : 'border-slate-700 bg-black/40'}`}>{confirmCheck && <CheckCircle2 size={12} className="text-black" />}</div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest select-none">Confirm this transaction</p></div>
+                          <button disabled={!confirmCheck || processing} onClick={handleConfirmTransaction} className="w-full py-5 primary-gradient-new text-black !rounded-[2.5rem] flex items-center justify-center gap-3 shadow-glow-lime">{processing ? <Loader2 className="animate-spin" size={20}/> : <ShieldCheck size={20}/>} Confirm</button>
+                      </div>
+                  )}
+              </div>
+          );
+      }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in max-w-5xl mx-auto pb-20">
@@ -233,87 +324,7 @@ export const Wallet: React.FC<WalletProps> = ({
               <div className="widget-card-2025 w-full max-w-sm border-brand-lime rounded-[3rem] bg-slate-950 shadow-huge">
                   <div className="p-6 border-b border-white/5 flex justify-between items-center"><h3 className="text-[10px] font-black text-white uppercase tracking-widest">{showModal}</h3><button onClick={closeModal} className="p-2 bg-white/5 rounded-full text-slate-500"><X size={18}/></button></div>
                   <div className="p-10 space-y-8">
-                      {showModal === 'SEND' || showModal === 'RECEIVE' ? (
-                          step === 1 ? (
-                              <form onSubmit={handleNextStep} className="space-y-6">
-                                  <div className="space-y-2">
-                                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">{showModal === 'SEND' ? 'Receiver' : 'Sender'} Username</label>
-                                      <div className="relative group">
-                                          <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
-                                          <input required className="tech-input-new pl-12" value={p2pForm.targetUsername} onChange={e => setP2PForm({...p2pForm, targetUsername: e.target.value})} placeholder="Username" />
-                                      </div>
-                                      {p2pTargetUser && <p className="text-[9px] text-emerald-500 pl-4 font-bold">VERIFIED: {p2pTargetUser.name}</p>}
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                      <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-4">Amount</label>
-                                      <div className="relative group">
-                                          <Coins size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-lime/50 group-focus-within:text-brand-lime transition-colors" />
-                                          <input required type="number" className="tech-input-new pl-12" value={p2pForm.amount} onChange={e => setP2PForm({...p2pForm, amount: e.target.value})} placeholder="0.00" />
-                                      </div>
-                                  </div>
-
-                                  {showModal === 'SEND' && (
-                                      <div className="space-y-4 bg-amber-900/10 p-4 rounded-2xl border border-amber-500/20">
-                                          <div className="flex items-start gap-2 text-[9px] text-amber-500 font-bold uppercase tracking-wide">
-                                              <AlertTriangle size={14} className="shrink-0" />
-                                              <p>Security Verification Required</p>
-                                          </div>
-                                          <div className="space-y-2">
-                                              <label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-1">2-Step Code</label>
-                                              <div className="relative group">
-                                                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500/50 group-focus-within:text-amber-500 transition-colors" />
-                                                  <input required type="password" className="tech-input-new pl-12 text-center tracking-[0.5em] font-mono text-amber-500 border-amber-500/30 focus:border-amber-500" value={p2pForm.pin} onChange={e => setP2PForm({...p2pForm, pin: e.target.value})} placeholder="******" maxLength={6} />
-                                              </div>
-                                              <p className="text-[8px] text-slate-600 text-center">Enter your security PIN to authorize this transfer.</p>
-                                          </div>
-                                      </div>
-                                  )}
-                                  {error && <p className="text-red-500 text-[10px] font-bold bg-red-900/20 p-2 rounded">{error}</p>}
-                                  <button type="submit" className="w-full primary-gradient-new !rounded-[2.5rem]">Next</button>
-                              </form>
-                          ) : (
-                              <div className="space-y-6 text-center">
-                                  <div className="p-6 bg-slate-900 rounded-3xl border border-white/5"><p className="text-slate-500 text-[10px] uppercase font-bold">Total {showModal === 'SEND' ? 'Sent' : 'Requested'}</p><h3 className="text-3xl font-black text-white font-tech">{p2pForm.amount} OTF</h3>
-                                  {showModal === 'SEND' && <p className="text-amber-500 text-[10px] font-bold mt-1">+ {(Number(p2pForm.amount) * systemSettings.p2pFeePercent/100).toFixed(2)} Fee</p>}
-                                  </div>
-                                  <div className="flex items-center gap-3 p-4 bg-brand-lime/5 rounded-2xl cursor-pointer" onClick={() => setConfirmCheck(!confirmCheck)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${confirmCheck ? 'bg-brand-lime border-brand-lime' : 'border-slate-700'}`}>{confirmCheck && <CheckCircle2 size={12} className="text-black" />}</div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Confirm Transaction</p></div>
-                                  <button disabled={!confirmCheck || processing} onClick={handleConfirmTransaction} className="w-full py-5 primary-gradient-new text-black !rounded-[2.5rem] flex items-center justify-center gap-3">{processing ? <Loader2 className="animate-spin"/> : <Send size={16}/>} Execute</button>
-                              </div>
-                          )
-                      ) : (
-                          step === 1 ? (
-                              <form onSubmit={handleNextStep} className="space-y-6">
-                                  <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-8">Amount (OTF)</label><div className="relative group"><Coins className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30 transition-colors" size={20}/><input required type="number" className="tech-input-new pl-16 text-xl font-black" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" /></div></div>
-                                  {showModal === 'WITHDRAWAL' && (
-                                    <div className="space-y-3 animate-slide-in-right border-t border-white/5 pt-4">
-                                      <div className="relative group"><Building2 className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} placeholder="Bank Name" /></div>
-                                      <div className="relative group"><Hash className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs font-mono" value={formData.accountNumber} onChange={e => setFormData({...formData, accountNumber: e.target.value})} placeholder="Account Number" /></div>
-                                      <div className="relative group"><UserIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 !py-3 !text-xs" value={formData.accountName} onChange={e => setFormData({...formData, accountName: e.target.value})} placeholder="Full Legal Name" /></div>
-                                    </div>
-                                  )}
-                                  {error && <div className="p-3 rounded-xl bg-red-900/20 text-red-400 text-[10px] font-bold border border-red-500/20 animate-bounce">{error}</div>}
-                                  <button type="submit" className="w-full primary-gradient-new !rounded-[2.5rem]">Next</button>
-                              </form>
-                          ) : (
-                              <div className="space-y-8 animate-fade-in text-center">
-                                  {showModal === 'DEPOSIT' && pendingDeposit && pendingDeposit.depositStage === 'WAITING_PAYMENT' ? (
-                                      <div className="space-y-6">
-                                           <div className="bg-slate-900 p-6 rounded-3xl border border-white/5 space-y-3 font-mono text-xs"><p><span className="text-slate-600">BANK:</span> <span className="text-white uppercase">{systemSettings.bankName}</span></p><p><span className="text-slate-600">ACC:</span> <span className="text-brand-lime font-black">{systemSettings.accountNumber}</span></p></div>
-                                           <div className="space-y-2"><label className="text-[9px] text-slate-500 font-black uppercase tracking-widest pl-8">Transaction Reference</label><div className="relative group"><Hash className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-lime/30" size={18}/><input required className="tech-input-new pl-16 font-mono text-xl text-amber-500 tracking-widest" placeholder="Reference ID" value={formData.ftNumber} onChange={e => setFormData({...formData, ftNumber: e.target.value})} /></div></div>
-                                           <button onClick={() => handleSubmitProof(pendingDeposit.id)} className="w-full py-4 primary-gradient-new text-black !rounded-[2.5rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-glow-lime">Submit Proof</button>
-                                      </div>
-                                  ) : (
-                                      <div className="space-y-8">
-                                          <div className="p-8 bg-slate-900 rounded-[2.5rem] border border-brand-lime/20 shadow-inner"><p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Final Amount</p><h4 className="text-4xl font-black text-white mt-4 font-tech">{numAmount.toLocaleString()} <span className="text-sm font-normal text-brand-lime">OTF</span></h4></div>
-                                          <div className="flex items-center gap-3 p-4 bg-brand-lime/5 rounded-2xl border border-brand-lime/10 cursor-pointer" onClick={() => setConfirmCheck(!confirmCheck)}><div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${confirmCheck ? 'bg-brand-lime border-brand-lime' : 'border-slate-700 bg-black/40'}`}>{confirmCheck && <CheckCircle2 size={12} className="text-black" />}</div><p className="text-[10px] text-slate-400 font-black uppercase tracking-widest select-none">Confirm this transaction</p></div>
-                                          <button disabled={!confirmCheck || processing} onClick={handleConfirmTransaction} className="w-full py-5 primary-gradient-new text-black !rounded-[2.5rem] flex items-center justify-center gap-3 shadow-glow-lime">{processing ? <Loader2 className="animate-spin" size={20}/> : <ShieldCheck size={20}/>} Confirm</button>
-                                      </div>
-                                  )}
-                              </div>
-                          )
-                      )
-                  }
+                      {(showModal === 'SEND' || showModal === 'RECEIVE') ? renderP2PContent() : renderStandardContent()}
                   </div>
               </div>
           </div>

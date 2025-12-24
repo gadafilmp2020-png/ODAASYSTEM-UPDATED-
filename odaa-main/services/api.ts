@@ -1,39 +1,49 @@
 
 import { User, Transaction, MarketOrder, ActiveTrade } from '../types';
-import { MOCK_USERS } from '../constants';
 
-// Keys matched to System.tsx to ensure shared data access
-const STORAGE_KEYS = {
-    USERS: 'odaa_users_v12',
-    MARKET: 'odaa_market_v12',
-    TRADES: 'odaa_trades_v12'
+// Cast import.meta to any to resolve TS error about missing env property on ImportMeta
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+
+const getHeaders = () => {
+  const user = localStorage.getItem('odaa_session_v30');
+  const token = user ? JSON.parse(user).token : '';
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
 };
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const getLocal = (key: string, def: any) => {
-    try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : def;
-    } catch { return def; }
-};
-
-// API is now primarily a set of helpers for the System component
-// Most state mutation logic has been moved to System.tsx to ensure React state consistency
 export const api = {
-  async getMarketOrders() { 
-      await delay(500);
-      return getLocal(STORAGE_KEYS.MARKET, []);
+  // Auth
+  async login(credentials: any) {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    if (!res.ok) throw new Error((await res.json()).message);
+    return res.json();
   },
 
-  async getActiveTrades(userId: string) { 
-      await delay(300);
-      const trades = getLocal(STORAGE_KEYS.TRADES, []);
-      return trades.filter((t: ActiveTrade) => t.buyerId === userId || t.sellerId === userId);
+  async register(data: any) {
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error((await res.json()).message);
+    return res.json();
   },
 
-  // Helper to generate IDs
-  generateId(prefix: string = 'id') {
-      return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Data Fetching
+  async getDashboardData() {
+    const res = await fetch(`${API_URL}/users/dashboard`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch dashboard');
+    return res.json();
+  },
+
+  async getTree() {
+    const res = await fetch(`${API_URL}/users/tree`, { headers: getHeaders() });
+    return res.json();
   }
 };
