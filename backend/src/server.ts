@@ -1,3 +1,4 @@
+
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -12,20 +13,26 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: '*', // Allow all for cPanel, or specify your frontend domain
+    origin: ['https://etcareproduct.com', 'https://www.etcareproduct.com', 'http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 app.use(helmet());
-app.use(express.json({ limit: '10mb' })); // Increased limit for image uploads
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
-// Basic Health Check
+// API Health Check
+app.get('/api', (req, res) => {
+  res.status(200).json({ status: 'online', message: 'Odaa System API Connected' });
+});
+
+// Basic Root Check
 app.get('/', (req, res) => {
-  res.send('Odaa System API is running (SQL/cPanel Mode)...');
+  res.send('Odaa Backend Server is Running.');
 });
 
 const PORT = process.env.PORT || 5000;
@@ -34,8 +41,6 @@ const PORT = process.env.PORT || 5000;
 sequelize.authenticate()
   .then(() => {
     console.log('SQL Database Connected via Sequelize...');
-    // Sync creates tables if they don't exist. 
-    // alter: true updates schema if changed without deleting data.
     return sequelize.sync({ alter: true }); 
   })
   .then(() => {
